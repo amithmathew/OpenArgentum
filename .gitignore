@@ -1,0 +1,39 @@
+# Data (sensitive - never commit)
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+
+# SQLite artifacts
+*.db-shm
+*.db-wal
+
+# Build artifacts
+frontend/.build-stamp
+frontend/.pkg.cache
+
+# GIF recording workspace
+scripts/gifs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
