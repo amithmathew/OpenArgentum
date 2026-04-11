@@ -177,9 +177,23 @@ def update_statement(statement_id: int, update: dict):
         if "account_id" in update:
             account_id = update["account_id"]
             conn.execute("UPDATE statements SET account_id = ? WHERE id = ?", (account_id, statement_id))
-            # Also update all transactions for this statement
+            # Update all transactions and recompute fingerprints (fingerprint includes account_id)
             conn.execute("UPDATE transactions SET account_id = ? WHERE statement_id = ?", (account_id, statement_id))
+            from backend.services.ingestion import compute_fingerprint, normalize_description
+            txns = conn.execute("SELECT id, date, amount_cents, description_raw FROM transactions WHERE statement_id = ?", (statement_id,)).fetchall()
+            occurrence_counts = {}
+            for txn in txns:
+                base_key = f"{txn['date']}|{txn['amount_cents']}|{normalize_description(txn['description_raw'])}|{account_id or 0}"
+                occ = occurrence_counts.get(base_key, 0)
+                occurrence_counts[base_key] = occ + 1
+                fp = compute_fingerprint(txn['date'], txn['amount_cents'], txn['description_raw'], account_id, occ)
+                conn.execute("UPDATE transactions SET fingerprint = ? WHERE id = ?", (fp, txn['id']))
             conn.commit()
+            # If statement was waiting for account assignment, mark as completed
+            if existing["status"] == "needs_account":
+                conn.execute("UPDATE statements SET status = 'completed', error_message = NULL WHERE id = ?", (statement_id,))
+                conn.commit()
+            logger.info(f"Assigned account {account_id} to statement #{statement_id}, updated {len(txns)} transaction fingerprints")
 
         row = conn.execute("SELECT * FROM statements WHERE id = ?", (statement_id,)).fetchone()
         return dict(row)

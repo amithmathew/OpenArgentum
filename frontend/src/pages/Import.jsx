@@ -64,6 +64,7 @@ const STATUS_COLORS = {
   queued: { bg: '--color-badge-manual-bg', text: '--color-badge-manual-text' },
   processing: { bg: '--color-accent-light', text: '--color-accent-text' },
   completed: { bg: '--color-badge-auto-bg', text: '--color-success' },
+  needs_account: { bg: '--color-warning-bg', text: '--color-warning' },
   failed: { bg: '--color-warning-bg', text: '--color-danger' },
 }
 
@@ -138,11 +139,11 @@ function StatementRow({ stmt, accounts, selected, onToggleSelect, onDelete, onIn
       <td className="px-4 py-2.5">
         <a href={`/api/statements/${stmt.id}/file`} target="_blank" rel="noopener noreferrer"
           className="font-medium truncate max-w-xs block hover:underline" style={{ color: 'var(--color-accent-text)' }}>{stmt.filename}</a>
-        {stmt.statement_period_start && (
-          <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            {stmt.statement_period_start} to {stmt.statement_period_end}
-          </div>
-        )}
+      </td>
+      <td className="px-4 py-2.5 text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+        {stmt.statement_period_start ? (
+          <>{stmt.statement_period_start}<br/>{stmt.statement_period_end && `to ${stmt.statement_period_end}`}</>
+        ) : '—'}
       </td>
       {showAccount && (
         <td className="px-4 py-2.5">
@@ -190,8 +191,8 @@ function StatementRow({ stmt, accounts, selected, onToggleSelect, onDelete, onIn
 }
 
 function StatementList({ statements, accounts, onDelete, onIngest, onAssignAccount, onCreateAndAssign, selected, onToggleSelect, onSelectAll, groupBy }) {
-  const [sortBy, setSortBy] = useState('filename')
-  const [sortDir, setSortDir] = useState('asc')
+  const [sortBy, setSortBy] = useState('date')
+  const [sortDir, setSortDir] = useState('desc')
 
   const handleSort = (field) => {
     if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -284,6 +285,7 @@ function StatementList({ statements, accounts, onDelete, onIngest, onAssignAccou
                 className="cursor-pointer accent-[var(--color-accent)]" />
             </th>
             <SortHeader label="Filename" field="filename" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Statement Date" field="date" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             <SortHeader label="Account" field="account" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
             <SortHeader label="Txns" field="transaction_count" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} align="right" />
@@ -337,6 +339,7 @@ function AccountGroup({ group, sortBy, sortDir, onSort, onSelectAll, rowProps, a
             <tr>
               <th className="text-left px-4 py-2 w-10" />
               <SortHeader label="Filename" field="filename" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+              <SortHeader label="Statement Date" field="date" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
               {showAccount && <SortHeader label="Account" field="account" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
               <SortHeader label="Status" field="status" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
               <SortHeader label="Txns" field="transaction_count" sortBy={sortBy} sortDir={sortDir} onSort={onSort} align="right" />

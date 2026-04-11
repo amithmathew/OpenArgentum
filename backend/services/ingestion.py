@@ -456,15 +456,60 @@ def ingest_statement(statement_id: int) -> None:
 
         conn.commit()
 
-        # Update statement as completed
+        # If still no account assigned, try to match by transaction overlap with existing accounts
+        stmt = conn.execute("SELECT * FROM statements WHERE id = ?", (statement_id,)).fetchone()
+        if not stmt["account_id"] and inserted > 0:
+            # Get a sample of this statement's transactions
+            new_txns = conn.execute(
+                "SELECT date, amount_cents, description_raw FROM transactions WHERE statement_id = ? LIMIT 50",
+                (statement_id,),
+            ).fetchall()
+
+            # Check each account for matching transactions (same date + amount + similar description)
+            accounts = conn.execute("SELECT id, name FROM accounts").fetchall()
+            best_account = None
+            best_matches = 0
+            for acct in accounts:
+                matches = 0
+                for txn in new_txns:
+                    hit = conn.execute(
+                        "SELECT 1 FROM transactions WHERE account_id = ? AND date = ? AND amount_cents = ? AND statement_id != ? LIMIT 1",
+                        (acct["id"], txn["date"], txn["amount_cents"], statement_id),
+                    ).fetchone()
+                    if hit:
+                        matches += 1
+                if matches > best_matches:
+                    best_matches = matches
+                    best_account = acct
+
+            # Require at least 3 matching transactions or 30% overlap to auto-assign
+            if best_account and (best_matches >= 3 or best_matches / len(new_txns) >= 0.3):
+                account_id = best_account["id"]
+                conn.execute("UPDATE statements SET account_id = ? WHERE id = ?", (account_id, statement_id))
+                conn.execute("UPDATE transactions SET account_id = ? WHERE statement_id = ?", (account_id, statement_id))
+                # Recompute fingerprints with the new account_id
+                txns_to_update = conn.execute("SELECT id, date, amount_cents, description_raw FROM transactions WHERE statement_id = ?", (statement_id,)).fetchall()
+                occ_counts = {}
+                for t in txns_to_update:
+                    bk = f"{t['date']}|{t['amount_cents']}|{normalize_description(t['description_raw'])}|{account_id or 0}"
+                    occ = occ_counts.get(bk, 0)
+                    occ_counts[bk] = occ + 1
+                    fp = compute_fingerprint(t['date'], t['amount_cents'], t['description_raw'], account_id, occ)
+                    conn.execute("UPDATE transactions SET fingerprint = ? WHERE id = ?", (fp, t['id']))
+                conn.commit()
+                logger.info(f"  Auto-matched to account '{best_account['name']}' ({best_matches}/{len(new_txns)} transactions matched)")
+
+        # Update statement as completed (use needs_account status if no account assigned)
+        stmt = conn.execute("SELECT * FROM statements WHERE id = ?", (statement_id,)).fetchone()
+        final_status = 'completed' if stmt["account_id"] else 'needs_account'
         conn.execute(
             """UPDATE statements SET
-               status = 'completed',
-               error_message = NULL,
+               status = ?,
+               error_message = ?,
                transaction_count = ?,
                processed_at = datetime('now')
                WHERE id = ?""",
-            (inserted, statement_id),
+            (final_status, 'No account detected — please assign one on the Import page' if final_status == 'needs_account' else None, inserted, statement_id),
         )
         conn.commit()
 
