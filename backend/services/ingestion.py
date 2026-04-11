@@ -350,23 +350,34 @@ def ingest_statement(statement_id: int) -> None:
         # Insert transactions with inline categorization from Gemini
         inserted = 0
         for txn in all_transactions:
-            date = txn.get("date", "")
-            description = txn.get("description_clean") or txn.get("description", "")
-            description_raw = txn.get("description_raw") or txn.get("raw_text", "") or description
-            raw_amount = txn.get("amount", 0)
+            # Coerce all fields — Gemini can return unexpected types (strings for numbers, numbers for strings, etc.)
+            date = str(txn.get("date") or "").strip()
+            if not date:
+                continue  # Skip transactions with no date
+            description = str(txn.get("description_clean") or txn.get("description") or "").strip()
+            description_raw = str(txn.get("description_raw") or txn.get("raw_text") or description).strip()
+            try:
+                raw_amount = float(txn.get("amount", 0))
+            except (TypeError, ValueError):
+                raw_amount = 0
             amount_cents = int(round(raw_amount * 100))
-            txn_type = txn.get("transaction_type", "purchase")
-            is_transfer = 1 if txn.get("is_transfer", False) else 0
-            balance = txn.get("balance")
-            balance_cents = int(round(balance * 100)) if balance is not None else None
-            reference = txn.get("reference")
+            if amount_cents == 0:
+                continue  # Skip zero-amount entries (likely parsing artifacts)
+            txn_type = str(txn.get("transaction_type") or "purchase")
+            is_transfer_raw = txn.get("is_transfer", False)
+            is_transfer = 1 if is_transfer_raw in (True, 1, "true", "True", "yes") else 0
+            try:
+                balance_cents = int(round(float(txn["balance"]) * 100)) if txn.get("balance") is not None else None
+            except (TypeError, ValueError):
+                balance_cents = None
+            reference = str(txn["reference"]) if txn.get("reference") is not None else None
 
             # Resolve category from Gemini's response
             category_id = None
             tier_id = None
             categorization_status = "pending"
-            cat_name = txn.get("category")
-            tier_name = txn.get("tier")
+            cat_name = str(txn["category"]).strip() if txn.get("category") else None
+            tier_name = str(txn["tier"]).strip() if txn.get("tier") else None
 
             if cat_name and not is_transfer:
                 # Find or create category
@@ -421,8 +432,11 @@ def ingest_statement(statement_id: int) -> None:
             )
             txn_db_id = cursor.lastrowid
 
-            # Process tags from Gemini
-            for tag_name in txn.get("tags") or []:
+            # Process tags from Gemini (could be list or comma-separated string)
+            raw_tags = txn.get("tags") or []
+            if isinstance(raw_tags, str):
+                raw_tags = [t.strip() for t in raw_tags.split(",") if t.strip()]
+            for tag_name in raw_tags:
                 tag_row = conn.execute("SELECT id FROM tags WHERE name = ?", (tag_name,)).fetchone()
                 if tag_row:
                     tag_id_val = tag_row["id"]
