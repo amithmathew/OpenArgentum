@@ -200,6 +200,24 @@ function LLMConfig() {
           {config?.llm_configured ? `${config.llm_provider === 'adc' ? 'GCP ADC' : 'API Key'} configured` : 'Not configured'}
         </span>
       </div>
+
+      <div className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
+        <p className="mb-1 font-semibold" style={{ color: 'var(--color-text)' }}>How Google handles your data</p>
+        <p className="mb-1.5">
+          Your statements are sent to Google Gemini. We recommend Google's <strong>paid</strong> data terms — enable{' '}
+          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Cloud Billing</a>{' '}
+          on your API key's project, or use GCP credentials (Vertex AI). Under the paid terms, Google <strong>doesn't use your prompts or responses to train its models</strong> or have them reviewed by humans, and processes them under its{' '}
+          <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Data Processing Addendum</a>. Billing status — not spend — is what applies these terms, so you can stay within the free quota.
+        </p>
+        <p className="mb-1.5">
+          A free key with no billing uses the <strong>unpaid</strong> tier, where Google uses your content to improve its products and human reviewers may read it. Google's terms state: <em>“Do not submit sensitive, confidential, or personal information to the Unpaid Services.”</em> Bank statements are exactly that, so we don't recommend the free tier for real financial data.
+        </p>
+        <p style={{ color: 'var(--color-text-muted)' }}>
+          These terms are Google's and can change at any time — you're responsible for reviewing the current{' '}
+          <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Gemini API terms</a>.
+        </p>
+      </div>
+
       <div className="flex gap-2 mb-3">
         <button onClick={() => setProvider('api_key')}
           className="px-3 py-1 text-xs font-medium rounded-lg"
@@ -829,6 +847,8 @@ export default function Settings() {
           </p>
           <p className="mb-3">
             AI features powered by <a href="https://ai.google.dev/" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-primary)' }}>Google Gemini</a>
+            {' · '}
+            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-primary)' }}>How Google uses your data</a>
           </p>
           <div className="flex gap-4 text-xs">
             <a href="https://github.com/amithmathew/OpenArgentum" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-primary)' }}>GitHub</a>

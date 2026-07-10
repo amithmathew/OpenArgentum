@@ -183,6 +183,22 @@ OpenArgentum stores everything locally and reaches out to exactly one external s
 - **Network access is off by default.** When you enable it with `--headless`, it's protected by an auto-generated PIN with brute-force protection.
 - **Localhost is unauthenticated.** Anything running on your machine can reach the app on localhost, so treat your own machine as the trust boundary.
 
+### How Google handles the data you send to Gemini
+
+Because your statements leave your machine to reach Gemini, **how Google may use that data matters** — and it differs by tier. **We recommend using Google's paid data terms** for real financial data:
+
+- **Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI).** Under the paid terms, Google **does not use your prompts or responses to train its models** or have them reviewed by humans, and processes them under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* — not spend — is what applies these terms, so you can stay within the free usage quota and still be protected.
+- **A free API key with no billing uses the "Unpaid" tier**, where Google uses your content to improve its products and human reviewers may read it. Google's own terms state: *"Do not submit sensitive, confidential, or personal information to the Unpaid Services."* Bank statements are exactly that, so we don't recommend the free tier for real financial data — it's fine for the demo or throwaway data.
+
+| | Free / Unpaid (no billing) | Paid (billing enabled) | Vertex AI (Google Cloud) |
+|---|---|---|---|
+| Used to improve Google products / train models | Yes | No | No |
+| Human review of prompts & responses | Yes (identifiers stripped first) | No | No (abuse-monitoring only; [opt-out available](https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance)) |
+| Governed by a Data Processing Addendum | No | Yes | Yes (Cloud DPA) |
+| Google's guidance | "Do not submit sensitive, confidential, or personal information" | Suitable for sensitive data | Enterprise data terms |
+
+Sources: [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) · [Data logging policy](https://ai.google.dev/gemini-api/docs/logs-policy) · [Vertex AI data governance](https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance). **These terms are set by Google and can change at any time — you are responsible for reviewing the current terms before sending real data.**
+
 ---
 
 ## Updating
@@ -202,11 +218,14 @@ Your database, config, and uploaded files live in the `data/` directory which is
 
 ### API Key Setup
 
-**Option A: API Key** (recommended)
-1. Get a free key from [Google AI Studio](https://aistudio.google.com/apikey)
-2. Enter it during onboarding, or later on the Settings page
+For **real financial data we recommend Google's paid data terms** — see [How Google handles the data you send to Gemini](#how-google-handles-the-data-you-send-to-gemini) above for why. Both options below work; enabling [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on your key's project (Option A) or using Google Cloud credentials (Option B) puts you on the paid terms.
 
-**Option B: Google Cloud credentials**
+**Option A: API Key**
+1. Get a key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Enter it during onboarding, or later on the Settings page
+3. For paid data terms, enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the key's Google Cloud project (you can stay within the free quota). Without billing, the key uses the Unpaid tier — fine for the demo, not for real statements.
+
+**Option B: Google Cloud credentials (Vertex AI)** — enterprise data terms
 1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 2. Run `gcloud auth application-default login`
 3. Select "Application Default Credentials" during onboarding
