@@ -41,17 +41,22 @@ Open **http://localhost:8099** and the onboarding wizard will walk you through s
 
 ---
 
-## Try the Demo — no API key needed
+## Explore with Sample Data
 
-Want to look around before importing your own statements? OpenArgentum ships with a sample database of realistic transactions.
+OpenArgentum ships with a demo database of realistic (synthetic) transactions and a sample statement, so you can evaluate it before pointing it at your own finances.
 
-1. Clone and launch as shown in [Quick Start](#quick-start) — you can skip the API key step in onboarding for now.
-2. Open **Settings → Databases** and switch to the **Demo** database.
-3. Explore the dashboard, transactions, projects, and charts with pre-loaded data.
+**Look around now — no API key:**
 
-> **Fastest path:** run `./start.sh --demo` to boot straight into the demo database with no onboarding and no key required.
+1. Launch the app (or run `./start.sh --demo` to boot straight in).
+2. Browse the dashboard, transactions, projects, and charts with pre-loaded data.
 
-Browsing the demo makes no external calls and needs no Gemini key — only statement import and the Aurelia assistant require one. Any changes you make to the demo reset when you restart the server.
+Browsing makes no external calls and needs no key. Any changes reset when you restart.
+
+**Try the AI features — add a key, use our sample:**
+
+The signature features — statement import and the Aurelia assistant — call Gemini, so they need an API key. To test them without touching your real data, add a key and import the bundled `demo/sample_statement.pdf`. It's synthetic, so a free key is fine for this — watch OpenArgentum extract and categorize every transaction, then ask Aurelia about it.
+
+When you're ready for your own statements, see [Configuration](#configuration) for why we recommend a paid-tier key for real financial data.
 
 ---
 
@@ -199,6 +204,8 @@ Because your statements leave your machine to reach Gemini, **how Google may use
 
 Sources: [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) · [Data logging policy](https://ai.google.dev/gemini-api/docs/logs-policy) · [Vertex AI data governance](https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance). **These terms are set by Google and can change at any time — you are responsible for reviewing the current terms before sending real data.**
 
+> *OpenArgentum is an independent, open-source project. It is not affiliated with, endorsed by, or sponsored by Google. Google, Gemini, Google Cloud, and Vertex AI are trademarks of Google LLC.*
+
 ---
 
 ## Updating
@@ -305,3 +312,9 @@ openargentum/
 <p>This starts the Vite dev server with hot module replacement and the backend with auto-reload. The Vite dev server proxies <code>/api</code> requests to the backend.</p>
 
 </details>
+
+---
+
+## Disclaimer
+
+*OpenArgentum is a personal bookkeeping and analysis tool — not financial, investment, tax, accounting, or legal advice. AI-generated categorizations and insights can be incomplete or incorrect; always verify against your original statements and consult a qualified professional before making financial decisions.*
