@@ -237,9 +237,9 @@ Most users won't need these -- the UI handles everything.
 <details>
 <summary><strong>Developer Details</strong></summary>
 
-### Architecture
+<h3>Architecture</h3>
 
-```
+<pre>
 openargentum/
   start.sh              # One-command setup and launch
   run.py                # Server entry point
@@ -267,22 +267,22 @@ openargentum/
     statements/         # Uploaded files
     snapshots/          # Database snapshots
     sandboxes/          # Aurelia analysis sandbox DBs
-```
+</pre>
 
-### Tech Stack
+<h3>Tech Stack</h3>
 
-**Backend:** Python 3, FastAPI, SQLite, google-genai SDK, pdfplumber
+<p><strong>Backend:</strong> Python 3, FastAPI, SQLite, google-genai SDK, pdfplumber</p>
 
-**Frontend:** React 19, Vite, TailwindCSS, Recharts, TanStack React Query
+<p><strong>Frontend:</strong> React 19, Vite, TailwindCSS, Recharts, TanStack React Query</p>
 
-**AI:** Google Gemini 2.5 Flash
+<p><strong>AI:</strong> Google Gemini 2.5 Flash</p>
 
-### Development
+<h3>Development</h3>
 
-```bash
+<pre>
 ./start.sh --dev
-```
+</pre>
 
-This starts the Vite dev server with hot module replacement and the backend with auto-reload. The Vite dev server proxies `/api` requests to the backend.
+<p>This starts the Vite dev server with hot module replacement and the backend with auto-reload. The Vite dev server proxies <code>/api</code> requests to the backend.</p>
 
 </details>
