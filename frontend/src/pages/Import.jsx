@@ -450,7 +450,7 @@ export default function Import() {
       await Promise.all(promises)
       queryClient.invalidateQueries({ queryKey: ['statements'] })
       setSelected(new Set())
-    } catch (err) {
+    } catch {
       // Even if some fail, refresh and keep going
       queryClient.invalidateQueries({ queryKey: ['statements'] })
     } finally {
@@ -467,7 +467,7 @@ export default function Import() {
       await Promise.all(promises)
       queryClient.invalidateQueries({ queryKey: ['statements'] })
       setSelected(new Set())
-    } catch (err) {
+    } catch {
       queryClient.invalidateQueries({ queryKey: ['statements'] })
     } finally {
       setBulkInProgress(false)

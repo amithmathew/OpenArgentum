@@ -60,7 +60,21 @@ def get_app_config():
         "has_network_pin": bool(config.get("network_pin_hash")),
         "headless": bool(os.getenv("OPENARGENTUM_HEADLESS")),
         "local_ip": _get_local_ip(),
+        "change_set_cap": config.get("aurelia_change_set_cap", 50),
     }
+
+
+@router.post("/change-set-cap")
+def set_change_set_cap(request: dict):
+    """Set the max number of edits Aurelia may bundle into one approval set."""
+    try:
+        cap = int(request.get("cap"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="cap must be a number")
+    if cap < 1 or cap > 500:
+        raise HTTPException(status_code=400, detail="cap must be between 1 and 500")
+    set_config_value("aurelia_change_set_cap", cap)
+    return {"status": "ok", "change_set_cap": cap}
 
 
 @router.post("/models")

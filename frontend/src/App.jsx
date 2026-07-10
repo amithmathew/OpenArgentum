@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, Component } from 'react'
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import ChatPanel from './components/ChatPanel'
+import { ChatContext } from './chat-context'
 import OnboardingWizard from './components/OnboardingWizard'
 import { api } from './api'
 import AppLogo from './components/AppLogo'
@@ -109,8 +110,12 @@ function MobileBottomNav({ onChatOpen, onCloseChat, chatActive }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const location = useLocation()
 
-  // Close "more" menu on navigation
-  useEffect(() => { setMoreOpen(false) }, [location.pathname])
+  // Close "more" menu on navigation (adjust state during render when the path changes)
+  const [prevPath, setPrevPath] = useState(location.pathname)
+  if (prevPath !== location.pathname) {
+    setPrevPath(location.pathname)
+    setMoreOpen(false)
+  }
 
   const handleNavClick = () => { setMoreOpen(false); onCloseChat() }
 
@@ -232,7 +237,7 @@ function PinLogin({ onSuccess }) {
     try {
       await api.post('/auth/login', { pin })
       onSuccess()
-    } catch (err) {
+    } catch {
       setError('Invalid PIN')
     } finally {
       setLoading(false)
@@ -268,11 +273,21 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('nav-collapsed') === 'true')
   const [chatOpen, setChatOpen] = useState(false)
   const [chatFullscreen, setChatFullscreen] = useState(false)
+  const [pendingPrompt, setPendingPrompt] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [needsAuth, setNeedsAuth] = useState(false)
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+
+  // Open the Aurelia chat with a prompt that auto-sends (used by the dashboard banner).
+  const chatContextValue = useMemo(() => ({
+    askAurelia: (prompt) => {
+      setPendingPrompt(prompt)
+      setChatOpen(true)
+      if (!isMobile) setChatFullscreen(true)
+    },
+  }), [isMobile])
 
   useEffect(() => {
     // Check auth status first
@@ -311,6 +326,7 @@ export default function App() {
   }
 
   return (
+    <ChatContext.Provider value={chatContextValue}>
     <div className="flex h-screen-safe overflow-hidden" style={{ backgroundColor: 'var(--color-bg)' }}>
       <nav
         className="hidden md:flex flex-col shrink-0 transition-all duration-200"
@@ -419,11 +435,14 @@ export default function App() {
 
       <ChatErrorBoundary onClose={() => { setChatOpen(false); setChatFullscreen(false) }}>
         <ChatPanel open={chatOpen || chatFullscreen} fullscreen={chatFullscreen} isMobile={isMobile}
+          initialPrompt={pendingPrompt}
+          onPromptConsumed={() => setPendingPrompt(null)}
           onClose={() => { setChatOpen(false); setChatFullscreen(false) }}
           onToggleFullscreen={() => { setChatFullscreen(f => !f); if (!chatOpen) setChatOpen(true) }}
           onNavigate={(path) => { if (chatFullscreen) setChatFullscreen(false); navigate(path) }} />
       </ChatErrorBoundary>
       {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
     </div>
+    </ChatContext.Provider>
   )
 }

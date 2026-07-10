@@ -1,6 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-
-const ThemeContext = createContext()
+import { useState, useEffect } from 'react'
+import { ThemeContext } from './theme-context'
 
 const THEMES = [
   { id: 'mist', label: 'Mist', description: 'Soft blue-gray', preview: ['#f0f4f8', '#5b8def', '#e4ecf4'] },
@@ -26,8 +25,4 @@ export function ThemeProvider({ children }) {
       {children}
     </ThemeContext.Provider>
   )
-}
-
-export function useTheme() {
-  return useContext(ThemeContext)
 }

@@ -186,6 +186,21 @@ CREATE TABLE IF NOT EXISTS transaction_notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_txn_notes_txn_id ON transaction_notes(transaction_id, created_at);
+
+CREATE TABLE IF NOT EXISTS transaction_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    old_label TEXT,
+    new_label TEXT,
+    note TEXT,
+    author_type TEXT NOT NULL DEFAULT 'user' CHECK (author_type IN ('user', 'aurelia')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_txn_overrides_txn ON transaction_overrides(transaction_id, created_at);
 """
 
 SEED_TIERS = [

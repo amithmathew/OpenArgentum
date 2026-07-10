@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import google.auth
 from google import genai
 from google.genai import types
@@ -8,6 +9,29 @@ from backend.config import get_active_model
 logger = logging.getLogger(__name__)
 
 _client = None
+
+_RATE_LIMIT_MARKERS = ("429", "resource exhausted", "resource_exhausted", "rate limit")
+
+
+def _is_rate_limit_error(e) -> bool:
+    msg = str(e).lower()
+    return any(m in msg for m in _RATE_LIMIT_MARKERS)
+
+
+def call_with_backoff(fn, *args, max_attempts=4, base_delay=2.0, max_delay=16.0, **kwargs):
+    """Call a Gemini API function, retrying transient rate-limit (429) errors with
+    exponential backoff. Non-rate-limit errors propagate immediately."""
+    attempt = 0
+    while True:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            attempt += 1
+            if attempt >= max_attempts or not _is_rate_limit_error(e):
+                raise
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            logger.warning(f"Gemini rate-limited (attempt {attempt}/{max_attempts - 1}); retrying in {delay:.0f}s")
+            time.sleep(delay)
 
 SYSTEM_PROMPT = """You are a precise financial document parser and categorizer. Extract every transaction from bank statements and categorize them.
 
@@ -259,7 +283,8 @@ Return JSON:
     pdf_part = types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf")
 
     try:
-        response = client.models.generate_content(
+        response = call_with_backoff(
+            client.models.generate_content,
             model=get_active_model("document"),
             contents=[pdf_part, user_prompt],
             config=types.GenerateContentConfig(
@@ -327,7 +352,8 @@ Return JSON:
 }}"""
 
     try:
-        response = client.models.generate_content(
+        response = call_with_backoff(
+            client.models.generate_content,
             model=get_active_model("document"),
             contents=user_prompt,
             config=types.GenerateContentConfig(

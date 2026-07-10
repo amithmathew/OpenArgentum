@@ -5,6 +5,7 @@ import { api } from '../api'
 import InstitutionIcon from '../components/InstitutionIcon'
 import TypeaheadSelect from '../components/TypeaheadSelect'
 import TransactionNotes from '../components/TransactionNotes'
+import TransactionHistory from '../components/TransactionHistory'
 import useIsMobile from '../hooks/useIsMobile'
 
 function hexToRgba(hex, alpha) {
@@ -212,11 +213,93 @@ function InlineTagPicker({ txnId, currentTagIds, tags, isVisible }) {
   )
 }
 
-function TransactionRow({ txn, categories, tiers, projects, tags, selected, onToggleSelect, onUpdate, onReviewTransfer, expanded, onToggleExpand, onFilterByTag, isMobile }) {
+function TransactionEditFields({ txn, onUpdate }) {
+  const centsToInput = (c) => (c == null ? '' : (c / 100).toFixed(2))
+  const [editing, setEditing] = useState(false)
+  const [desc, setDesc] = useState(txn.description || '')
+  const [date, setDate] = useState(txn.date || '')
+  const [amount, setAmount] = useState(centsToInput(txn.amount_cents))
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // Re-sync inputs to the current transaction whenever it changes or the editor opens.
+  const resetFields = () => {
+    setDesc(txn.description || '')
+    setDate(txn.date || '')
+    setAmount(centsToInput(txn.amount_cents))
+    setNote('')
+  }
+  useEffect(() => {
+    setDesc(txn.description || '')
+    setDate(txn.date || '')
+    setAmount(centsToInput(txn.amount_cents))
+  }, [txn.description, txn.date, txn.amount_cents])
+
+  const openEditor = () => { resetFields(); setEditing(true) }
+  const closeEditor = () => { resetFields(); setEditing(false) }
+
+  const parsedCents = amount === '' ? null : Math.round(parseFloat(amount) * 100)
+  const dirty =
+    desc !== (txn.description || '') ||
+    date !== (txn.date || '') ||
+    (parsedCents != null && !Number.isNaN(parsedCents) && parsedCents !== txn.amount_cents)
+
+  const handleSave = async () => {
+    if (!dirty || saving) return
+    const data = {}
+    if (desc !== (txn.description || '')) data.description = desc
+    if (date !== (txn.date || '')) data.date = date
+    if (parsedCents != null && !Number.isNaN(parsedCents) && parsedCents !== txn.amount_cents) data.amount_cents = parsedCents
+    if (Object.keys(data).length === 0) return
+    if (note.trim()) data.note = note.trim()
+    setSaving(true)
+    try {
+      await onUpdate(txn.id, data)
+      setNote('')
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--color-border-light)' }} onClick={e => e.stopPropagation()}>
+        <button onClick={openEditor} className="inline-flex items-center gap-1 text-xs hover:underline" style={{ color: 'var(--color-accent-text)' }}>
+          <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354l-1.086-1.086zM11.189 6.25L9.75 4.81l-6.286 6.287a.25.25 0 00-.064.108l-.558 1.953 1.953-.558a.25.25 0 00.108-.064l6.286-6.286z"/></svg>
+          Edit fields
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--color-border-light)' }} onClick={e => e.stopPropagation()}>
+      <div className="text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Edit fields</div>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-1.5 mb-1.5">
+        <input className="theme-input px-2 py-1 text-xs" value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description" autoFocus />
+        <input type="date" className="theme-input px-2 py-1 text-xs" value={date} onChange={e => setDate(e.target.value)} />
+        <input className="theme-input px-2 py-1 text-xs w-28 text-right" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" inputMode="decimal" />
+      </div>
+      <div className="flex gap-1.5">
+        <input className="theme-input flex-1 px-2 py-1 text-xs" value={note} onChange={e => setNote(e.target.value)} placeholder="Reason for change (optional)" />
+        <button onClick={closeEditor} disabled={saving}
+          className="theme-btn-secondary px-2 py-1 text-xs disabled:opacity-50 shrink-0">Cancel</button>
+        <button onClick={handleSave} disabled={!dirty || saving}
+          className="theme-btn-primary px-2 py-1 text-xs disabled:opacity-50 shrink-0">
+          {saving ? '...' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function TransactionRow({ txn, categories, tiers, projects, tags, selected, onToggleSelect, onUpdate, onReviewTransfer, expanded, onToggleExpand, onFilterByTag, onRemoveTag, onHide, isMobile }) {
+  const [showHistory, setShowHistory] = useState(false)
   const effectiveTierId = txn.tier_id || categories.find(c => c.id === txn.category_id)?.default_tier_id
   const tierObj = tiers.find(t => t.id === effectiveTierId)
   const catObj = categories.find(c => c.id === txn.category_id)
-  const isUncategorized = !!!txn.is_transfer && !txn.category_id
+  const isUncategorized = !txn.is_transfer && !txn.category_id
 
   const handleRowClick = (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'OPTION') return
@@ -259,7 +342,7 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
               {tierObj.name}
             </span>
           )}
-          {!!txn.is_transfer && !!!txn.needs_review && (
+          {!!txn.is_transfer && !txn.needs_review && (
             <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: 'var(--color-transfer)' }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
@@ -267,10 +350,15 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
           {txn.tag_ids && txn.tag_ids.split(',').map(tid => {
             const tag = tags.find(t => t.id === parseInt(tid))
             return tag ? (
-              <button key={'t' + tid} className="rounded-md px-1.5 py-0.5 text-[11px] font-medium cursor-pointer hover:opacity-80"
-                style={{ backgroundColor: hexToRgba(tag.color, 0.13), color: tag.color, border: `1px solid ${hexToRgba(tag.color, 0.25)}` }}
-                onClick={(e) => { e.stopPropagation(); if (onFilterByTag) onFilterByTag(tag.id) }}
-              >{tag.name}</button>
+              <span key={'t' + tid} className="group/tag inline-flex items-center gap-0.5 rounded-md pl-1.5 pr-1 py-0.5 text-[11px] font-medium"
+                style={{ backgroundColor: hexToRgba(tag.color, 0.13), color: tag.color, border: `1px solid ${hexToRgba(tag.color, 0.25)}` }}>
+                <span className="cursor-pointer hover:opacity-80" title={`Filter by tag: ${tag.name}`}
+                  onClick={(e) => { e.stopPropagation(); if (onFilterByTag) onFilterByTag(tag.id) }}
+                >{tag.name}</span>
+                <span role="button" title="Remove tag" className="cursor-pointer leading-none opacity-0 group-hover/tag:opacity-100 hover:opacity-100 transition-opacity"
+                  onClick={(e) => { e.stopPropagation(); if (onRemoveTag) onRemoveTag(txn.id, tag.id) }}
+                >×</span>
+              </span>
             ) : null
           })}
           {txn.project_ids && txn.project_ids.split(',').map(pid => {
@@ -311,7 +399,7 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
             <span className="font-medium text-sm truncate" style={{ color: 'var(--color-text)' }}>
               {txn.description}
             </span>
-            {!!txn.is_transfer && !!!txn.needs_review && (
+            {!!txn.is_transfer && !txn.needs_review && (
               <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ color: 'var(--color-transfer)' }} title="Transfer">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
@@ -333,14 +421,32 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
                 {tierObj.name}
               </span>
             )}
+            {txn.note_count > 0 && (
+              <span className="theme-badge ml-1" style={{ backgroundColor: 'var(--color-surface-alt)', color: 'var(--color-text-muted)' }}>
+                <svg className="w-2.5 h-2.5 mr-0.5 inline-block -mt-px" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v8a1 1 0 01-1 1H5l-3 3V3z"/></svg>
+                {txn.note_count}
+              </span>
+            )}
+            {txn.override_count > 0 && (
+              <button onClick={(e) => { e.stopPropagation(); setShowHistory(true) }}
+                className="theme-badge ml-1 cursor-pointer hover:opacity-80" title="View edit history"
+                style={{ backgroundColor: 'var(--color-surface-alt)', color: 'var(--color-text-muted)' }}>
+                <svg className="w-2.5 h-2.5 mr-0.5 inline-block -mt-px" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.223.416l3 2a.5.5 0 10.554-.832L8 7.732V3.5z"/><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM2.5 8a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0z"/></svg>
+                edited
+              </button>
+            )}
             {txn.tag_ids && txn.tag_ids.split(',').map(tid => {
               const tag = tags.find(t => t.id === parseInt(tid))
               return tag ? (
-                <button key={'t' + tid} className="theme-badge ml-1 cursor-pointer hover:opacity-80"
-                  style={{ backgroundColor: hexToRgba(tag.color, 0.13), color: tag.color }}
-                  onClick={(e) => { e.stopPropagation(); if (onFilterByTag) onFilterByTag(tag.id) }}
-                  title={`Filter by tag: ${tag.name}`}
-                >{tag.name}</button>
+                <span key={'t' + tid} className="theme-badge group/tag ml-1 inline-flex items-center gap-0.5"
+                  style={{ backgroundColor: hexToRgba(tag.color, 0.13), color: tag.color }}>
+                  <span className="cursor-pointer hover:opacity-80" title={`Filter by tag: ${tag.name}`}
+                    onClick={(e) => { e.stopPropagation(); if (onFilterByTag) onFilterByTag(tag.id) }}
+                  >{tag.name}</span>
+                  <span role="button" title="Remove tag" className="cursor-pointer leading-none opacity-0 group-hover/tag:opacity-100 hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); if (onRemoveTag) onRemoveTag(txn.id, tag.id) }}
+                  >×</span>
+                </span>
               ) : null
             })}
             {txn.project_ids && txn.project_ids.split(',').map(pid => {
@@ -353,12 +459,6 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
               ) : null
             })}
             <InlineTagPicker txnId={txn.id} currentTagIds={txn.tag_ids} tags={tags} onUpdate={onUpdate} />
-            {txn.note_count > 0 && (
-              <span className="theme-badge ml-1" style={{ backgroundColor: 'var(--color-surface-alt)', color: 'var(--color-text-muted)' }}>
-                <svg className="w-2.5 h-2.5 mr-0.5 inline-block -mt-px" viewBox="0 0 16 16" fill="currentColor"><path d="M2 3a1 1 0 011-1h10a1 1 0 011 1v8a1 1 0 01-1 1H5l-3 3V3z"/></svg>
-                {txn.note_count}
-              </span>
-            )}
           </div>
         </div>
 
@@ -426,20 +526,25 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
               </select>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-x-4 md:gap-x-8 gap-y-1 text-xs" style={{ maxWidth: isMobile ? '100%' : 500 }}>
-            {txn.account_name && (
-              <>
-                <span style={{ color: 'var(--color-text-muted)' }}>Account</span>
-                <span className="flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                  <InstitutionIcon institution={txn.account_institution} iconUrl={txn.account_icon_url} size={14} />
-                  {txn.account_name}
-                </span>
-              </>
-            )}
+          <div className="grid grid-cols-[max-content_1fr] gap-x-4 sm:gap-x-6 gap-y-1.5 text-xs md:max-w-[680px]">
+            <span style={{ color: 'var(--color-text-muted)' }}>Description</span>
+            <span className="break-words" style={{ color: 'var(--color-text-secondary)' }}>{txn.description}</span>
+
             {txn.description_raw && (
               <>
                 <span style={{ color: 'var(--color-text-muted)' }}>Raw description</span>
-                <span style={{ color: 'var(--color-text-secondary)' }}>{txn.description_raw}</span>
+                <span className="break-words font-mono text-[11px]" style={{ color: 'var(--color-text-muted)' }} title="Verbatim text read from the statement (not editable)">
+                  {txn.description_raw}
+                </span>
+              </>
+            )}
+            {txn.account_name && (
+              <>
+                <span style={{ color: 'var(--color-text-muted)' }}>Account</span>
+                <span className="flex items-center gap-1.5 min-w-0" style={{ color: 'var(--color-text-secondary)' }}>
+                  <InstitutionIcon institution={txn.account_institution} iconUrl={txn.account_icon_url} size={14} />
+                  <span className="break-words">{txn.account_name}</span>
+                </span>
               </>
             )}
             <span style={{ color: 'var(--color-text-muted)' }}>Status</span>
@@ -449,7 +554,7 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
             {txn.reference && (
               <>
                 <span style={{ color: 'var(--color-text-muted)' }}>Reference</span>
-                <span style={{ color: 'var(--color-text-secondary)' }}>{txn.reference}</span>
+                <span className="break-words" style={{ color: 'var(--color-text-secondary)' }}>{txn.reference}</span>
               </>
             )}
             {txn.balance_cents != null && (
@@ -462,7 +567,7 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
               <>
                 <span style={{ color: 'var(--color-text-muted)' }}>Source</span>
                 <a href={`/api/statements/${txn.statement_id}/file`} target="_blank" rel="noopener noreferrer"
-                   className="hover:underline" style={{ color: 'var(--color-accent-text)' }}>
+                   className="hover:underline break-words" style={{ color: 'var(--color-accent-text)' }}>
                   {txn.statement_filename || 'View source'}
                 </a>
               </>
@@ -480,19 +585,19 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
           {!!txn.is_suspected_duplicate && txn.dup_original_date && (
             <div className="mt-2 pt-2 text-xs" style={{ borderTop: '1px solid var(--color-border-light)' }}>
               <div className="font-medium mb-1.5" style={{ color: 'var(--color-warning)' }}>Possible duplicate of:</div>
-              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+              <div className="grid grid-cols-[max-content_1fr] gap-x-4 sm:gap-x-6 gap-y-1.5 mb-2 md:max-w-[680px]" style={{ color: 'var(--color-text-secondary)' }}>
                 <span style={{ color: 'var(--color-text-muted)' }}>Date</span>
                 <span>{txn.dup_original_date}</span>
 
                 <span style={{ color: 'var(--color-text-muted)' }}>Description</span>
-                <span>{txn.dup_original_description}</span>
+                <span className="break-words">{txn.dup_original_description}</span>
 
                 <span style={{ color: 'var(--color-text-muted)' }}>Amount</span>
                 <span className="font-mono">{formatAmount(txn.dup_original_amount)}</span>
 
                 <span style={{ color: 'var(--color-text-muted)' }}>Source</span>
                 <a href={`/api/statements/${txn.dup_original_statement_id}/file`} target="_blank" rel="noopener noreferrer"
-                  className="hover:underline" style={{ color: 'var(--color-accent-text)' }}>
+                  className="hover:underline break-words" style={{ color: 'var(--color-accent-text)' }}>
                   {txn.dup_original_statement}
                 </a>
               </div>
@@ -504,39 +609,79 @@ function TransactionRow({ txn, categories, tiers, projects, tags, selected, onTo
               </div>
             </div>
           )}
+          {/* Editable fields */}
+          <TransactionEditFields txn={txn} onUpdate={onUpdate} />
+          <div className="flex items-center gap-3 mt-1.5">
+            {txn.override_count > 0 && (
+              <button onClick={(e) => { e.stopPropagation(); setShowHistory(true) }}
+                className="text-xs hover:underline" style={{ color: 'var(--color-accent-text)' }}>
+                View edit history ({txn.override_count})
+              </button>
+            )}
+            {onHide && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (txn.is_hidden) { onHide(txn.id, false); return }
+                  if (confirm('Hide this transaction? It will be excluded from all reports and totals. You can restore it later.')) onHide(txn.id, true)
+                }}
+                className="text-xs hover:underline"
+                style={{ color: txn.is_hidden ? 'var(--color-accent-text)' : 'var(--color-danger)' }}
+                title={txn.is_hidden ? 'Restore to reports' : 'Exclude from all reports and totals'}
+              >
+                {txn.is_hidden ? 'Restore to reports' : 'Hide (exclude from reports)'}
+              </button>
+            )}
+          </div>
           {/* Transaction notes */}
           <TransactionNotes transactionId={txn.id} />
         </div>
+      )}
+      {showHistory && (
+        <TransactionHistory transactionId={txn.id} onClose={() => setShowHistory(false)} />
       )}
     </div>
   )
 }
 
-function useSearchParamsFilters() {
-  const [searchParams] = useSearchParams()
-  const filterKeys = ['date_from', 'date_to', 'category_id', 'tier_id', 'tag_id', 'project_id', 'account_id', 'search', 'is_transfer', 'needs_review']
+const FILTER_KEYS = ['date_from', 'date_to', 'category_id', 'tier_id', 'tag_id', 'project_id', 'account_id', 'search', 'is_transfer', 'needs_review', 'uncategorized', 'is_suspected_duplicate']
+
+function parseSearchParamFilters(searchParams) {
   const filters = {}
-  for (const key of filterKeys) {
+  for (const key of FILTER_KEYS) {
     const val = searchParams.get(key)
     if (val) filters[key] = val
   }
-  return { filters, key: searchParams.toString() }
+  return filters
+}
+
+function useSearchParamsFilters() {
+  const [searchParams] = useSearchParams()
+  return { filters: parseSearchParamFilters(searchParams), searchParams }
 }
 
 export default function Transactions() {
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
-  const { filters: urlFilters, key: urlKey } = useSearchParamsFilters()
+  const { filters: urlFilters, searchParams } = useSearchParamsFilters()
   const [filters, setFilters] = useState(urlFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [quickFilter, setQuickFilter] = useState('all')
 
-  // Update filters when URL search params change (e.g., from chat navigation)
-  useEffect(() => {
-    if (Object.keys(urlFilters).length > 0) {
-      setFilters(urlFilters)
-      setQuickFilter('all')
+  // Update filters when URL search params change (e.g., from chat navigation).
+  // Adjust state during render on searchParams change rather than in an effect.
+  const [prevSearchParams, setPrevSearchParams] = useState(searchParams)
+  if (prevSearchParams !== searchParams) {
+    setPrevSearchParams(searchParams)
+    const next = parseSearchParamFilters(searchParams)
+    if (Object.keys(next).length > 0) {
+      setFilters(next)
+      // Highlight the matching quick-filter tab when arriving via a deep link.
+      const onlyKey = Object.keys(next).length === 1 ? Object.keys(next)[0] : null
+      const tabForKey = { needs_review: 'needs-action', is_transfer: 'transfers', uncategorized: 'uncategorized', is_suspected_duplicate: 'duplicates' }
+      setQuickFilter(tabForKey[onlyKey] || 'all')
     }
-  }, [urlKey])
+  }
   const [sortBy, setSortBy] = useState('date')
   const [sortDir, setSortDir] = useState('desc')
   const [selected, setSelected] = useState(new Set())
@@ -579,8 +724,6 @@ export default function Transactions() {
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: () => api.get('/accounts') })
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => api.get('/projects') })
   const { data: tags = [] } = useQuery({ queryKey: ['tags'], queryFn: () => api.get('/tags') })
-  const { data: pendingData } = useQuery({ queryKey: ['pending-count'], queryFn: () => api.get('/transactions/pending-count') })
-  const pendingCount = pendingData?.count || 0
 
   const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
@@ -590,14 +733,26 @@ export default function Transactions() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2500)
   }, [])
 
+  // Refresh the list, tab counts, and every dashboard view a hide/exclude affects.
+  const invalidateReportData = () => {
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    queryClient.invalidateQueries({ queryKey: ['transaction-counts'] })
+    ;['dashboard-summary', 'dashboard-categories', 'dashboard-tiers', 'dashboard-tags', 'dashboard-trends', 'dashboard-accounts']
+      .forEach(k => queryClient.invalidateQueries({ queryKey: [k] }))
+  }
+
   const updateTxn = useMutation({
     mutationFn: ({ id, data }) => api.patch(`/transactions/${id}`, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['transaction-overrides', id] })
+      queryClient.invalidateQueries({ queryKey: ['transaction-counts'] })
+    },
   })
   const categorizeMutation = useMutation({
     mutationFn: (body) => api.post('/transactions/categorize', body),
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] }); queryClient.invalidateQueries({ queryKey: ['categories'] }); queryClient.invalidateQueries({ queryKey: ['pending-count'] })
+      queryClient.invalidateQueries({ queryKey: ['transactions'] }); queryClient.invalidateQueries({ queryKey: ['categories'] }); queryClient.invalidateQueries({ queryKey: ['pending-count'] }); queryClient.invalidateQueries({ queryKey: ['transaction-counts'] })
       const n = vars.transaction_ids?.length || 0
       showToast(vars.all ? 'Auto-categorizing all transactions...' : `Auto-categorized ${n} transaction${n !== 1 ? 's' : ''}`)
     },
@@ -607,6 +762,7 @@ export default function Transactions() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['categories'] })
+      queryClient.invalidateQueries({ queryKey: ['transaction-counts'] })
       const n = vars.transaction_ids?.length || 0
       if (vars.category_id) {
         const cat = categories.find(c => c.id === vars.category_id)
@@ -653,29 +809,25 @@ export default function Transactions() {
   const toggleSelect = (id) => { const next = new Set(selected); if (next.has(id)) next.delete(id); else next.add(id); setSelected(next) }
   const selectAll = () => { if (selected.size === transactions.length) setSelected(new Set()); else setSelected(new Set(transactions.map(t => t.id))) }
 
-  const transferReviewCount = transactions.filter(t => t.is_transfer && t.needs_review).length
-  const duplicateCount = transactions.filter(t => !!t.is_suspected_duplicate).length
-  const uncategorizedCount = transactions.filter(t => !t.category_id && !t.is_transfer && !t.is_hidden).length
-
-  const [quickFilter, setQuickFilter] = useState('all')
+  // Whole-dataset counts for the tab badges (server-side, not just the loaded page).
+  const { data: tabCounts } = useQuery({ queryKey: ['transaction-counts'], queryFn: () => api.get('/transactions/counts') })
+  const transferReviewCount = tabCounts?.needs_review || 0
+  const duplicateCount = tabCounts?.duplicates || 0
+  const uncategorizedCount = tabCounts?.uncategorized || 0
 
   const applyQuickFilter = (preset) => {
     setQuickFilter(preset)
     if (preset === 'needs-action') setFilters({ needs_review: 'true' })
     else if (preset === 'transfers') setFilters({ is_transfer: 'true' })
-    else if (preset === 'duplicates') setFilters({}) // client-side filter
-    else if (preset === 'uncategorized') setFilters({}) // client-side filter
+    else if (preset === 'duplicates') setFilters({ is_suspected_duplicate: 'true' })
+    else if (preset === 'uncategorized') setFilters({ uncategorized: 'true' })
     else setFilters({})
   }
 
   const isActiveTab = (id) => id === quickFilter
 
-  // Client-side filters for duplicates and uncategorized
-  const displayTransactions = quickFilter === 'duplicates'
-    ? transactions.filter(t => !!t.is_suspected_duplicate)
-    : quickFilter === 'uncategorized'
-    ? transactions.filter(t => !t.category_id && !t.is_transfer && !t.is_hidden)
-    : transactions
+  // All tabs now filter server-side, so the loaded list is already the right set.
+  const displayTransactions = transactions
 
   return (
     <div>
@@ -738,9 +890,7 @@ export default function Transactions() {
 
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
-          {['duplicates', 'uncategorized'].includes(quickFilter)
-            ? `${displayTransactions.length} transactions (filtered from ${total})`
-            : `${total} transactions`}
+          {`${total} transactions`}
           {isFetching && !isLoading && (
             <span className="inline-flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--color-accent)' }} />
@@ -836,7 +986,7 @@ export default function Transactions() {
                     tags={tags}
                     selected={selected.has(txn.id)}
                     onToggleSelect={toggleSelect}
-                    onUpdate={(id, data) => updateTxn.mutate({ id, data })}
+                    onUpdate={(id, data) => updateTxn.mutateAsync({ id, data })}
                     onReviewTransfer={(ids, confirm) => {
                       if (confirm) {
                         bulkUpdateMutation.mutate({ transaction_ids: ids, needs_review: false })
@@ -847,6 +997,20 @@ export default function Transactions() {
                     expanded={expandedId === txn.id}
                     onToggleExpand={(id) => setExpandedId(expandedId === id ? null : id)}
                     onFilterByTag={(tagId) => setFilters(prev => ({ ...prev, tag_id: String(tagId) }))}
+                    onRemoveTag={async (txnId, tagId) => {
+                      try {
+                        await api.post('/tags/unassign', { transaction_ids: [txnId], tag_id: tagId })
+                        queryClient.invalidateQueries({ queryKey: ['transactions'] })
+                        queryClient.invalidateQueries({ queryKey: ['tags'] })
+                      } catch {}
+                    }}
+                    onHide={async (txnId, hidden) => {
+                      try {
+                        await api.post('/transactions/hide', { transaction_ids: [txnId], hidden })
+                        invalidateReportData()
+                        showToast(hidden ? 'Hidden — excluded from all reports' : 'Restored to reports')
+                      } catch {}
+                    }}
                     isMobile={isMobile}
                   />
                 </div>
@@ -903,7 +1067,7 @@ export default function Transactions() {
             const count = selected.size
             if (confirm(`Hide ${count} selected transaction(s)? They won't appear in reports but can be restored from Settings.`)) {
               await api.post('/transactions/hide', { transaction_ids: [...selected], hidden: true })
-              queryClient.invalidateQueries({ queryKey: ['transactions'] })
+              invalidateReportData()
               setSelected(new Set())
               showToast(`Hid ${count} transaction${count !== 1 ? 's' : ''}`)
             }

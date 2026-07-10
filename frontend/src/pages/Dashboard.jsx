@@ -3,11 +3,31 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { api } from '../api'
-import { useTheme } from '../ThemeContext'
+import { useTheme } from '../theme-context'
+import { useChat } from '../chat-context'
+import InstitutionIcon from '../components/InstitutionIcon'
 import useIsMobile from '../hooks/useIsMobile'
 
 function formatDollars(cents) {
   return '$' + (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
+// Data-freshness cue for an account's most recent processed transaction.
+function accountFreshness(lastDate) {
+  if (!lastDate) return { rel: 'No transactions', dot: 'var(--color-text-muted)', stale: false }
+  const days = Math.floor((Date.now() - new Date(lastDate + 'T00:00:00').getTime()) / 86400000)
+  const rel = days <= 0 ? 'today'
+    : days === 1 ? '1 day ago'
+    : days < 30 ? `${days} days ago`
+    : days < 365 ? `~${Math.max(1, Math.round(days / 30))} mo ago`
+    : `~${Math.round(days / 365)} yr ago`
+  const dot = days > 35 ? 'var(--color-expense)' : days > 14 ? 'var(--color-warning)' : 'var(--color-income)'
+  return { rel, dot, stale: days > 35 }
+}
+
+function formatShortDate(d) {
+  if (!d) return '—'
+  return new Date(d + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function SummaryCard({ label, value, colorVar }) {
@@ -30,19 +50,17 @@ const PRESETS = [
 ]
 
 function useChartColors() {
-  const { theme } = useTheme()
-  return useMemo(() => {
-    const get = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'
-    return {
-      expense: get('--color-expense'),
-      income: get('--color-income'),
-      chart: [get('--color-chart-1'), get('--color-chart-2'), get('--color-chart-3'), get('--color-chart-4'), get('--color-chart-5'), get('--color-chart-6')],
-      text: get('--color-text-secondary'),
-      grid: get('--color-border-light'),
-      surface: get('--color-surface'),
-      border: get('--color-border'),
-    }
-  }, [theme])
+  useTheme() // re-render (and re-read CSS vars) when the theme changes
+  const get = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'
+  return {
+    expense: get('--color-expense'),
+    income: get('--color-income'),
+    chart: [get('--color-chart-1'), get('--color-chart-2'), get('--color-chart-3'), get('--color-chart-4'), get('--color-chart-5'), get('--color-chart-6')],
+    text: get('--color-text-secondary'),
+    grid: get('--color-border-light'),
+    surface: get('--color-surface'),
+    border: get('--color-border'),
+  }
 }
 
 export default function Dashboard() {
@@ -52,8 +70,15 @@ export default function Dashboard() {
   const c = useChartColors()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+  const { askAurelia } = useChat()
   const chartHeight = isMobile ? 200 : 280
   const yAxisWidth = isMobile ? 70 : 110
+
+  const { data: counts } = useQuery({ queryKey: ['transaction-counts'], queryFn: () => api.get('/transactions/counts') })
+  const suspectedTransfers = counts?.suspected_transfers || 0
+
+  const { data: accountsData } = useQuery({ queryKey: ['dashboard-accounts'], queryFn: () => api.get('/dashboard/accounts') })
+  const accounts = accountsData?.items || []
 
   const goToTransactions = (filters) => {
     const params = new URLSearchParams({ ...dateRange, ...filters }).toString()
@@ -68,8 +93,8 @@ export default function Dashboard() {
   const categoryByName = useMemo(() => Object.fromEntries(categories.map(c => [c.name, c])), [categories])
   const tierByName = useMemo(() => Object.fromEntries(tiers.map(t => [t.name, t])), [tiers])
 
-  // Compute date range from months preset
-  const dateRange = useMemo(() => {
+  // Compute date range from months preset (plain compute; used as a value-serialized query key)
+  const dateRange = (() => {
     if (isCustom) {
       return customFrom ? { date_from: customFrom, ...(customTo ? { date_to: customTo } : {}) } : {}
     }
@@ -83,7 +108,7 @@ export default function Dashboard() {
       from.setMonth(from.getMonth() - months)
     }
     return { date_from: from.toISOString().slice(0, 10), date_to: now.toISOString().slice(0, 10) }
-  }, [months, isCustom, customFrom, customTo])
+  })()
 
   const { data: summary } = useQuery({
     queryKey: ['dashboard-summary', months],
@@ -181,6 +206,27 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {suspectedTransfers > 0 && (
+        <div className="theme-card p-4 mb-6 flex flex-col @md:flex-row @md:items-center gap-3" style={{ borderLeft: '3px solid var(--color-warning)' }}>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm mb-0.5" style={{ color: 'var(--color-text)' }}>
+              {suspectedTransfers} transaction{suspectedTransfers === 1 ? '' : 's'} flagged as possible transfers
+            </div>
+            <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              These are <span className="font-medium">excluded</span> from your spending and income as suspected transfers. Review to confirm them — or catch any that are actually real income or expenses being left out.
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={() => navigate('/transactions?needs_review=true')}
+              className="theme-btn-secondary px-3 py-1.5 text-xs whitespace-nowrap">Review in Transactions</button>
+            <button onClick={() => askAurelia?.(
+              `I have ${suspectedTransfers} transactions that are marked as transfers but still pending my review (needs_review = 1) — these are the only ones I need to decide on. Ignore transfers I've already confirmed (needs_review = 0). Right now all transfers are excluded from my spending and income, so if any of these ${suspectedTransfers} were flagged by mistake, real income or expenses are being left out. Help me confirm which are genuine account-to-account transfers (credit-card payments, moving money between my own accounts) versus real income or expenses (like an Interac e-transfer to a person) flagged by mistake. Start with a quick first pass over just these ${suspectedTransfers}: group them by the clearest signal — obvious recurring payments and matching equal-and-opposite pairs (you can look across all my transactions to find each one's matching leg) — and show me what you find. Keep this first look concise. Then briefly note what else you could dig into (repeated or round amounts, weekly/monthly cadence, description clues) and ask whether I'd like you to go deeper.`
+            )}
+              className="theme-btn-primary px-3 py-1.5 text-xs whitespace-nowrap">Figure it out with Aurelia</button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 @md:grid-cols-4 gap-4 mb-8">
         <SummaryCard label="Total Spend" value={formatDollars(totalSpend)} colorVar="--color-expense" />
         <SummaryCard label="Total Income" value={formatDollars(totalIncome)} colorVar="--color-income" />
@@ -189,6 +235,37 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 @lg:grid-cols-2 gap-5">
+        <div className="theme-card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Accounts</h3>
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Last transaction</span>
+          </div>
+          <div className="space-y-3">
+            {accounts.map(a => {
+              const f = accountFreshness(a.last_transaction_date)
+              return (
+                <div key={a.id} className="flex items-center gap-3 min-w-0">
+                  <InstitutionIcon institution={a.institution} iconUrl={a.icon_url} size={22} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate" style={{ color: 'var(--color-text)' }}>{a.name}</div>
+                    <div className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
+                      {a.institution}{a.account_type ? ` · ${a.account_type}` : ''}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{formatShortDate(a.last_transaction_date)}</div>
+                    <div className="text-[11px] flex items-center justify-end gap-1" style={{ color: f.stale ? 'var(--color-expense)' : 'var(--color-text-muted)' }}>
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: f.dot }} />
+                      {f.rel}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {accounts.length === 0 && <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No accounts yet.</div>}
+          </div>
+        </div>
+
         <div className="theme-card p-5">
           <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-secondary)' }}>Monthly Spending</h3>
           <ResponsiveContainer width="100%" height={chartHeight}>

@@ -173,6 +173,11 @@ function InlineChart({ chart }) {
   )
 }
 
+const OVERRIDE_FIELD_LABELS = {
+  date: 'Date', description: 'Description', amount_cents: 'Amount',
+  category_id: 'Category', tier_id: 'Tier', is_transfer: 'Transfer', needs_review: 'Needs review',
+}
+
 function MutationProposal({ proposal, onAction }) {
   const [status, setStatus] = useState(proposal.status || 'pending')
   const [showAll, setShowAll] = useState(false)
@@ -185,7 +190,7 @@ function MutationProposal({ proposal, onAction }) {
       await api.post(`/mutations/${proposal.mutation_id}/execute`)
       setStatus('executed')
       if (onAction) onAction(proposal.mutation_id, 'executed')
-    } catch (e) {
+    } catch {
       setStatus('failed')
     }
   }
@@ -231,20 +236,32 @@ function MutationProposal({ proposal, onAction }) {
       <div className="font-medium mb-1" style={{ color: 'var(--color-text)' }}>{proposal.title}</div>
       {proposal.impacted_count > 0 && (
         <div className="mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
-          {proposal.impacted_count} transaction{proposal.impacted_count !== 1 ? 's' : ''} affected
+          {proposal.intent === 'override'
+            ? `${proposal.impacted_count} change${proposal.impacted_count !== 1 ? 's' : ''}`
+            : `${proposal.impacted_count} transaction${proposal.impacted_count !== 1 ? 's' : ''} affected`}
         </div>
       )}
       {(proposal.sample_items || []).length > 0 && (
         <div className="mb-2">
-          <div className="space-y-0.5">
-            {proposal.sample_items.slice(0, 3).map((item, i) => (
-              <div key={item.id || i} className="flex justify-between" style={{ color: 'var(--color-text-secondary)' }}>
-                <span className="truncate flex-1">{item.date} — {item.label}</span>
-                <span className="ml-2 font-mono shrink-0">${Math.abs(item.amount).toFixed(2)}</span>
+          <div className="space-y-1">
+            {(proposal.intent === 'override' ? proposal.sample_items : proposal.sample_items.slice(0, 3)).map((item, i) => (
+              <div key={item.id ? `${item.id}-${i}` : i} style={{ color: 'var(--color-text-secondary)' }}>
+                <div className="flex justify-between">
+                  <span className="truncate flex-1">{item.date} — {item.label}</span>
+                  {item.field == null && <span className="ml-2 font-mono shrink-0">${Math.abs(item.amount).toFixed(2)}</span>}
+                </div>
+                {item.field != null && (
+                  <div className="pl-2 truncate" style={{ color: 'var(--color-text-muted)' }}>
+                    {OVERRIDE_FIELD_LABELS[item.field] || item.field}:{' '}
+                    <span style={{ textDecoration: 'line-through' }}>{item.from ?? '—'}</span>
+                    {' → '}
+                    <span style={{ color: 'var(--color-text)' }}>{item.to ?? '—'}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          {hasMore && (
+          {proposal.intent !== 'override' && hasMore && (
             <button onClick={handleShowAll} className="mt-1 font-medium" style={{ color: 'var(--color-accent-text)' }}>
               {loadingFull ? 'Loading...' : `View all ${proposal.impacted_count} transactions →`}
             </button>
@@ -289,11 +306,11 @@ function MutationDetailModal({ title, items, totalCount, status, onApprove, onRe
     else { setSortBy(col); setSortDir('desc') }
   }
 
-  const SortCol = ({ col, children, align }) => (
-    <th className={`px-3 py-2 text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${align === 'right' ? 'text-right' : 'text-left'}`}
+  const renderSortCol = (col, label, align) => (
+    <th key={col} className={`px-3 py-2 text-xs font-medium uppercase tracking-wider cursor-pointer select-none ${align === 'right' ? 'text-right' : 'text-left'}`}
       style={{ color: sortBy === col ? 'var(--color-accent-text)' : 'var(--color-text-muted)' }}
       onClick={() => handleSort(col)}>
-      {children} {sortBy === col ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+      {label} {sortBy === col ? (sortDir === 'asc' ? '↑' : '↓') : ''}
     </th>
   )
 
@@ -326,9 +343,9 @@ function MutationDetailModal({ title, items, totalCount, status, onApprove, onRe
           <table className="w-full text-xs">
             <thead className="sticky top-0" style={{ backgroundColor: 'var(--color-surface-alt)' }}>
               <tr>
-                <SortCol col="date">Date</SortCol>
-                <SortCol col="label">Description</SortCol>
-                <SortCol col="amount" align="right">Amount</SortCol>
+                {renderSortCol('date', 'Date')}
+                {renderSortCol('label', 'Description')}
+                {renderSortCol('amount', 'Amount', 'right')}
               </tr>
             </thead>
             <tbody>
@@ -376,6 +393,9 @@ const TOOL_LABELS = {
   generate_chart: 'Generated chart',
   navigate_to_transactions: 'Opened transactions view',
   propose_bulk_tag: 'Proposed tagging',
+  propose_bulk_untag: 'Proposed tag removal',
+  propose_override: 'Proposed a correction',
+  propose_hide: 'Proposed hiding transactions',
   propose_bulk_recategorize: 'Proposed recategorization',
   propose_mark_transfer: 'Proposed transfer marking',
   propose_assign_project: 'Proposed project assignment',
@@ -386,7 +406,7 @@ const TOOL_LABELS = {
 
 function formatToolArgs(args) {
   if (!args || typeof args !== 'object') return ''
-  const entries = Object.entries(args).filter(([_, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0))
+  const entries = Object.entries(args).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0))
   if (entries.length === 0) return ''
   return entries.map(([k, v]) => {
     const label = k.replace(/_/g, ' ')
@@ -494,7 +514,7 @@ function ChatMessage({ msg, onNavigate }) {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
-      <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${isUser ? '' : ''}`}
+      <div className="max-w-[85%] min-w-0 break-words rounded-xl px-3 py-2 text-sm"
         style={{
           backgroundColor: isUser ? 'var(--color-accent)' : 'var(--color-surface)',
           color: isUser ? 'white' : 'var(--color-text)',
@@ -605,7 +625,7 @@ function EditableTitle({ title, onSave }) {
   )
 }
 
-export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscreen, onNavigate, isMobile }) {
+export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscreen, onNavigate, isMobile, initialPrompt, onPromptConsumed }) {
   const queryClient = useQueryClient()
   const [sessions, setSessions] = useState([])
   const [activeSessionId, setActiveSessionId] = useState(null)
@@ -675,12 +695,14 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId])
 
-  // Scroll to bottom when panel opens
+  // Scroll to bottom when the panel opens (only on the closed→open transition)
+  const wasOpenRef = useRef(false)
   useEffect(() => {
-    if (open && messages.length > 0) {
+    if (open && !wasOpenRef.current && messages.length > 0) {
       setTimeout(scrollToBottom, 100)
     }
-  }, [open])
+    wasOpenRef.current = open
+  }, [open, messages.length, scrollToBottom])
 
   // Focus input when panel opens
   useEffect(() => {
@@ -813,6 +835,8 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
     queryClient.invalidateQueries({ queryKey: ['dashboard-tiers'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard-tags'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard-trends'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard-accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['transaction-counts'] })
     queryClient.invalidateQueries({ queryKey: ['settings-stats'] })
   }
 
@@ -904,6 +928,24 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
     setShowSessions(false)
   }
 
+  // Auto-send a seeded prompt (e.g. from the dashboard "review transfers" banner) in a fresh session.
+  const handleSendRef = useRef(null)
+  useEffect(() => { handleSendRef.current = handleSend })
+  const seedHandledRef = useRef(false)
+  useEffect(() => {
+    if (!initialPrompt) { seedHandledRef.current = false; return }  // reset when parent clears it
+    if (!open || seedHandledRef.current) return
+    seedHandledRef.current = true
+    const prompt = initialPrompt
+    wantsNewSession.current = true
+    setActiveSessionId(null)
+    setMessages([])
+    onPromptConsumed?.()
+    // Fire after the reset render so handleSend sees a null session → creates a fresh one.
+    // No cleanup: consuming the prompt re-runs this effect, and we must not cancel the pending send.
+    setTimeout(() => handleSendRef.current?.(prompt), 60)
+  }, [open, initialPrompt, onPromptConsumed])
+
   const handleDeleteSession = async (id) => {
     if (isLoading && activeSessionId === id) return  // Can't delete active session while streaming
     await api.delete(`/chat/sessions/${id}`)
@@ -965,7 +1007,7 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
     {!fullscreen && <div className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={onClose} />}
 
     {/* Panel: fullscreen = flex-1 replacing main, side panel = fixed width, mobile = full overlay */}
-    <div className={`${fullscreen ? 'flex-1 relative' : 'fixed inset-0 z-50 md:relative md:inset-auto shrink-0'} h-full flex flex-col`}
+    <div className={`${fullscreen ? 'flex-1 relative min-w-0' : 'fixed inset-0 z-50 md:relative md:inset-auto shrink-0'} h-full flex flex-col overflow-hidden`}
       style={{ width: fullscreen || isMobile ? undefined : panelWidth, backgroundColor: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)' }}>
 
       {/* Resize handle (desktop only) */}
@@ -1069,7 +1111,7 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
       ) : (
         <>
           {/* Messages */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3">
+          <div ref={messagesContainerRef} className="flex-1 min-w-0 overflow-y-auto px-4 py-3">
             {messages.length === 0 && !isLoading && (
               <div className="text-center py-8">
                 <div className="flex justify-center mb-2"><AureliaIcon size={48} /></div>

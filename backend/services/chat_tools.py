@@ -22,6 +22,9 @@ TOOL_DESCRIPTIONS = {
     "generate_chart": "Building chart...",
     "navigate_to_transactions": "Preparing transaction view...",
     "propose_bulk_tag": "Preparing tag proposal...",
+    "propose_bulk_untag": "Preparing tag removal proposal...",
+    "propose_override": "Preparing correction proposal...",
+    "propose_hide": "Preparing hide proposal...",
     "propose_bulk_recategorize": "Preparing recategorization proposal...",
     "propose_mark_transfer": "Preparing transfer marking proposal...",
     "propose_assign_project": "Preparing project assignment proposal...",
@@ -37,7 +40,7 @@ TOOL_DESCRIPTIONS = {
 def query_transactions(date_from=None, date_to=None, categories=None, tiers=None,
                        account_id=None, account_name=None, search_text=None, is_transfer=None,
                        min_amount_cents=None, max_amount_cents=None,
-                       categorization_status=None, uncategorized=None, limit=25):
+                       categorization_status=None, uncategorized=None, needs_review=None, limit=25):
     """Search and filter transactions. Returns matching rows with joined category/tier/account names."""
     conn = get_db()
     try:
@@ -63,11 +66,16 @@ def query_transactions(date_from=None, date_to=None, categories=None, tiers=None
             conditions.append("t.account_id = ?")
             params.append(resolved_acct)
         if search_text:
-            conditions.append("(t.description LIKE ? OR t.description_raw LIKE ? OR EXISTS (SELECT 1 FROM transaction_notes tn WHERE tn.transaction_id = t.id AND tn.content LIKE ?))")
+            # Once a transaction's description has been manually corrected, its raw
+            # (LLM-transcribed) text is excluded from search — the correction wins.
+            conditions.append("(t.description LIKE ? OR (t.description_raw LIKE ? AND NOT EXISTS (SELECT 1 FROM transaction_overrides o WHERE o.transaction_id = t.id AND o.field_name = 'description')) OR EXISTS (SELECT 1 FROM transaction_notes tn WHERE tn.transaction_id = t.id AND tn.content LIKE ?))")
             params.extend([f"%{search_text}%", f"%{search_text}%", f"%{search_text}%"])
         if is_transfer is not None:
             conditions.append("t.is_transfer = ?")
             params.append(1 if is_transfer else 0)
+        if needs_review is not None:
+            conditions.append("t.needs_review = ?")
+            params.append(1 if needs_review else 0)
         if min_amount_cents is not None:
             conditions.append("t.amount_cents >= ?")
             params.append(min_amount_cents)
@@ -113,7 +121,7 @@ def aggregate_spending(group_by="category", date_from=None, date_to=None, includ
         params = []
 
         if not include_transfers:
-            conditions.append("NOT (t.is_transfer = 1 AND t.needs_review = 0)")
+            conditions.append("t.is_transfer = 0")
 
         if date_from:
             conditions.append("t.date >= ?")
@@ -134,7 +142,7 @@ def aggregate_spending(group_by="category", date_from=None, date_to=None, includ
             conditions.append("t.account_id = ?")
             params.append(resolved_acct)
         if search_text:
-            conditions.append("(t.description LIKE ? OR t.description_raw LIKE ?)")
+            conditions.append("(t.description LIKE ? OR (t.description_raw LIKE ? AND NOT EXISTS (SELECT 1 FROM transaction_overrides o WHERE o.transaction_id = t.id AND o.field_name = 'description')))")
             params.extend([f"%{search_text}%"] * 2)
 
         where = " AND ".join(conditions)
@@ -179,7 +187,7 @@ def compare_periods(period1_start, period1_end, period2_start, period2_end, grou
     conn = get_db()
     try:
         def get_totals(start, end):
-            conditions = ["t.is_hidden = 0", "t.amount_cents < 0", "NOT (t.is_transfer = 1 AND t.needs_review = 0)",
+            conditions = ["t.is_hidden = 0", "t.amount_cents < 0", "t.is_transfer = 0",
                           "t.date >= ?", "t.date <= ?"]
             params = [start, end]
             where = " AND ".join(conditions)
@@ -224,7 +232,7 @@ def get_summary(date_from=None, date_to=None):
     """Get overall financial summary."""
     conn = get_db()
     try:
-        conditions = ["t.is_hidden = 0", "NOT (t.is_transfer = 1 AND t.needs_review = 0)"]
+        conditions = ["t.is_hidden = 0", "t.is_transfer = 0"]
         params = []
         if date_from:
             conditions.append("t.date >= ?")
@@ -282,13 +290,19 @@ def generate_chart(chart_type, title, data):
 
 
 def navigate_to_transactions(date_from=None, date_to=None, category_name=None, tier_name=None,
-                             account_id=None, account_name=None, search=None, is_transfer=None):
-    """Generate navigation parameters for the transactions page. Resolves names to IDs."""
+                             account_id=None, account_name=None, search=None, is_transfer=None,
+                             uncategorized=None, **_ignored):
+    """Generate navigation parameters for the transactions page. Resolves names to IDs.
+
+    Unknown keyword args are ignored rather than raising, so a stray argument from
+    the model degrades to a partial filter instead of failing the whole request.
+    """
     conn = get_db()
     try:
         params = {}
         if date_from: params["date_from"] = date_from
         if date_to: params["date_to"] = date_to
+        if uncategorized: params["uncategorized"] = "true"
         if category_name:
             row = conn.execute("SELECT id FROM categories WHERE name = ?", (category_name,)).fetchone()
             if row: params["category_id"] = str(row["id"])

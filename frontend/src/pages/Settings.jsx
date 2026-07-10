@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { useTheme } from '../ThemeContext'
+import { useTheme } from '../theme-context'
 import InstitutionIcon from '../components/InstitutionIcon'
 
 function ActionButton({ label, description, confirmText, variant = 'default', onAction }) {
@@ -157,6 +157,9 @@ function LLMConfig() {
   const [documentModel, setDocumentModel] = useState('')
   const [modelSaving, setModelSaving] = useState(false)
   const [modelResult, setModelResult] = useState(null)
+  const [changeSetCap, setChangeSetCap] = useState('')
+  const [capSaving, setCapSaving] = useState(false)
+  const [capResult, setCapResult] = useState(null)
 
   useEffect(() => {
     api.get('/settings/app-config').then(c => {
@@ -164,6 +167,7 @@ function LLMConfig() {
       if (c.llm_provider && c.llm_provider !== 'none') setProvider(c.llm_provider)
       if (c.chat_model) setChatModel(c.chat_model)
       if (c.document_model) setDocumentModel(c.document_model)
+      if (c.change_set_cap != null) setChangeSetCap(String(c.change_set_cap))
     })
   }, [])
 
@@ -270,6 +274,35 @@ function LLMConfig() {
                 {modelResult.ok ? '✓ ' : '✗ '}{modelResult.message}
               </div>
             )}
+
+            <div className="pt-3" style={{ borderTop: '1px solid var(--color-border-light)' }}>
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Aurelia approval-set limit</label>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                Max number of edits Aurelia may bundle into one approval set. Larger sets are still gated by your approval; smaller keeps each set easy to review.
+              </p>
+              <div className="flex items-center gap-2">
+                <input type="number" min="1" max="500" className="theme-input w-24 px-3 py-1.5 text-sm" value={changeSetCap}
+                  onChange={e => setChangeSetCap(e.target.value)} placeholder="50" />
+                <button onClick={async () => {
+                  setCapSaving(true); setCapResult(null)
+                  try {
+                    const res = await api.post('/settings/change-set-cap', { cap: Number(changeSetCap) })
+                    setChangeSetCap(String(res.change_set_cap))
+                    setCapResult({ ok: true, message: `Limit set to ${res.change_set_cap}` })
+                  } catch (e) {
+                    setCapResult({ ok: false, message: e.message })
+                  } finally { setCapSaving(false) }
+                }} disabled={capSaving || !changeSetCap}
+                  className="theme-btn-primary px-4 py-1.5 text-sm disabled:opacity-50">
+                  {capSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+              {capResult && (
+                <div className="text-xs mt-1" style={{ color: capResult.ok ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                  {capResult.ok ? '✓ ' : '✗ '}{capResult.message}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -278,7 +311,6 @@ function LLMConfig() {
 }
 
 function NetworkSharing() {
-  const [config, setConfig] = useState(null)
   const [enabled, setEnabled] = useState(false)
   const [headless, setHeadless] = useState(false)
   const [pin, setPin] = useState('')
@@ -287,7 +319,6 @@ function NetworkSharing() {
 
   useEffect(() => {
     api.get('/settings/app-config').then(cfg => {
-      setConfig(cfg)
       setEnabled(!!cfg.network_sharing)
       setHeadless(!!cfg.headless)
     }).catch(() => {})

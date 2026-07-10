@@ -95,6 +95,13 @@ class TransactionUpdate(BaseModel):
     tier_id: Optional[int] = None
     is_transfer: Optional[bool] = None
     needs_review: Optional[bool] = None
+    date: Optional[str] = None
+    description: Optional[str] = None
+    amount_cents: Optional[int] = None
+    note: Optional[str] = None  # optional annotation attached to each override recorded in this call
+
+class OverrideRevertRequest(BaseModel):
+    field_name: str
 
 class BulkTransactionUpdate(BaseModel):
     transaction_ids: list[int]

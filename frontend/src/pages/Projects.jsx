@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api } from '../api'
-import { useTheme } from '../ThemeContext'
+import { useTheme } from '../theme-context'
 import TransactionNotes from '../components/TransactionNotes'
 
 function formatDollars(cents) {
@@ -16,7 +16,7 @@ function formatAmount(cents) {
   return cents < 0 ? `-$${formatted}` : `$${formatted}`
 }
 
-function ProjectCard({ project, onSelect, onDelete }) {
+function ProjectCard({ project, onSelect }) {
   const spent = project.total_spent_cents || 0
   const budget = project.budget_target_cents
   const progress = budget ? Math.min((spent / budget) * 100, 100) : null
@@ -99,11 +99,9 @@ function CreateProjectForm({ onClose, onCreate }) {
 }
 
 function useChartColors() {
-  const { theme } = useTheme()
-  return useMemo(() => {
-    const get = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'
-    return { text: get('--color-text-secondary'), grid: get('--color-border-light'), surface: get('--color-surface'), border: get('--color-border') }
-  }, [theme])
+  useTheme() // re-render (and re-read CSS vars) when the theme changes
+  const get = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'
+  return { text: get('--color-text-secondary'), grid: get('--color-border-light'), surface: get('--color-surface'), border: get('--color-border') }
 }
 
 function ProjectDetail({ projectId, onBack }) {

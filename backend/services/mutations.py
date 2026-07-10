@@ -2,6 +2,10 @@ import json
 import logging
 import uuid
 from backend.database import get_db
+from backend.config import get_config_value
+from backend.services.overrides import apply_field_update, coerce_human_value, label_for, OVERRIDABLE_FIELDS
+
+_NUMERIC_OVERRIDE_FIELDS = ("amount_cents", "category_id", "tier_id", "is_transfer", "needs_review")
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,108 @@ def propose_mutation(intent, title, params, session_id=None):
                     "impacted_count": 0, "sample_items": [],
                     "error": f"All {already_tagged_count} matching transaction(s) are already tagged '{tag_name}'. No changes needed.",
                 }
+
+        elif intent == "bulk_untag":
+            tag_name = params.get("tag_name", "")
+            transaction_ids = params.get("transaction_ids")
+            if transaction_ids:
+                rows = conn.execute(
+                    f"SELECT t.id, t.description, t.amount_cents, t.date FROM transactions t WHERE t.id IN ({','.join('?' * len(transaction_ids))})",
+                    transaction_ids,
+                ).fetchall()
+            else:
+                rows = _filter_transactions(conn, params)
+            # Keep only transactions that CURRENTLY have this tag
+            tag_row = conn.execute("SELECT id FROM tags WHERE name = ?", (tag_name,)).fetchone()
+            if not tag_row:
+                return {
+                    "mutation_id": None, "intent": intent, "title": title,
+                    "impacted_count": 0, "sample_items": [],
+                    "error": f"Tag '{tag_name}' doesn't exist. No changes needed.",
+                }
+            tagged = {r["transaction_id"] for r in conn.execute(
+                "SELECT transaction_id FROM transaction_tags WHERE tag_id = ?", (tag_row["id"],)
+            ).fetchall()}
+            not_tagged_count = sum(1 for r in rows if r["id"] not in tagged)
+            rows = [r for r in rows if r["id"] in tagged]
+            affected_ids = [r["id"] for r in rows]
+            sample_items = [{"id": r["id"], "label": r["description"], "amount": r["amount_cents"] / 100, "date": r["date"]} for r in rows[:5]]
+            title = title or f"Remove tag '{tag_name}' from {len(affected_ids)} transactions"
+            if not_tagged_count > 0 and len(affected_ids) == 0:
+                return {
+                    "mutation_id": None, "intent": intent, "title": title,
+                    "impacted_count": 0, "sample_items": [],
+                    "error": f"None of the matching transaction(s) have the tag '{tag_name}'. No changes needed.",
+                }
+
+        elif intent == "override":
+            no_op = {"mutation_id": None, "intent": intent, "impacted_count": 0, "sample_items": []}
+            # Accept a heterogeneous set of changes; tolerate the legacy single-triple shape.
+            changes = params.get("changes")
+            if not changes and params.get("transaction_id") is not None:
+                changes = [{"transaction_id": params.get("transaction_id"), "field": params.get("field"),
+                            "new_value": params.get("new_value"), "note": params.get("note")}]
+            if not changes:
+                return {**no_op, "title": title, "error": "No changes were provided."}
+            cap = get_config_value("aurelia_change_set_cap", 50)
+            if len(changes) > cap:
+                return {**no_op, "title": title,
+                        "error": f"That's {len(changes)} changes, over the approval-set limit of {cap}. Split it into smaller sets."}
+
+            def _norm(field, v):
+                if v is None:
+                    return None
+                return int(v) if field in _NUMERIC_OVERRIDE_FIELDS else str(v)
+
+            resolved = []
+            sample_items = []
+            affected_ids = []
+            for ch in changes:
+                c_txn = ch.get("transaction_id")
+                c_field = ch.get("field")
+                c_raw = ch.get("new_value")
+                if c_field not in OVERRIDABLE_FIELDS:
+                    return {**no_op, "title": title, "error": f"'{c_field}' is not an editable field."}
+                row = conn.execute("SELECT * FROM transactions WHERE id = ?", (c_txn,)).fetchone()
+                if not row:
+                    return {**no_op, "title": title, "error": f"Transaction {c_txn} not found."}
+                try:
+                    c_canonical = coerce_human_value(conn, c_field, c_raw)
+                except ValueError as e:
+                    return {**no_op, "title": title, "error": f"Transaction {c_txn}: {e}"}
+                if _norm(c_field, row[c_field]) == _norm(c_field, c_canonical):
+                    continue  # already at that value — silently skip
+                resolved.append({"transaction_id": c_txn, "field": c_field, "new_canonical": c_canonical, "note": ch.get("note")})
+                sample_items.append({
+                    "id": c_txn, "label": row["description"], "amount": row["amount_cents"] / 100, "date": row["date"],
+                    "field": c_field, "from": label_for(conn, c_field, row[c_field]), "to": label_for(conn, c_field, c_canonical),
+                })
+                affected_ids.append(c_txn)
+
+            if not resolved:
+                return {**no_op, "title": title, "error": "Those transactions already have those values. No changes needed."}
+            params = {**params, "changes": resolved}
+            n_txns = len(set(affected_ids))
+            title = title or (
+                f"Change {resolved[0]['field']} of transaction {resolved[0]['transaction_id']}: {sample_items[0]['from']} → {sample_items[0]['to']}"
+                if len(resolved) == 1
+                else f"Apply {len(resolved)} corrections across {n_txns} transaction{'s' if n_txns != 1 else ''}"
+            )
+
+        elif intent == "hide":
+            transaction_ids = params.get("transaction_ids") or []
+            target = 1 if params.get("hidden", True) else 0
+            if not transaction_ids:
+                return {"mutation_id": None, "intent": intent, "title": title, "impacted_count": 0, "sample_items": [], "error": "No transactions specified."}
+            rows = conn.execute(
+                f"SELECT t.id, t.description, t.amount_cents, t.date, t.is_hidden FROM transactions t WHERE t.id IN ({','.join('?' * len(transaction_ids))})",
+                transaction_ids,
+            ).fetchall()
+            rows = [r for r in rows if r["is_hidden"] != target]  # only those actually changing
+            affected_ids = [r["id"] for r in rows]
+            sample_items = [{"id": r["id"], "label": r["description"], "amount": r["amount_cents"] / 100, "date": r["date"]} for r in rows[:5]]
+            action = "Hide" if target else "Restore"
+            title = title or f"{action} {len(affected_ids)} transaction{'s' if len(affected_ids) != 1 else ''} ({'exclude from' if target else 'include in'} all reports)"
 
         elif intent == "bulk_recategorize":
             category_name = params.get("category_name", "")
@@ -202,6 +308,12 @@ def execute_mutation(mutation_id):
 
         if intent == "bulk_tag":
             _execute_bulk_tag(conn, mutation_id, affected_ids, params)
+        elif intent == "bulk_untag":
+            _execute_bulk_untag(conn, mutation_id, affected_ids, params)
+        elif intent == "override":
+            _execute_override(conn, mutation_id, affected_ids, params)
+        elif intent == "hide":
+            _execute_hide(conn, mutation_id, affected_ids, params)
         elif intent == "bulk_recategorize":
             _execute_bulk_recategorize(conn, mutation_id, affected_ids, params)
         elif intent == "mark_transfer":
@@ -359,6 +471,50 @@ def _execute_bulk_tag(conn, mutation_id, transaction_ids, params):
             conn.execute("INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)", (txn_id, tag_id))
             _log_change(conn, mutation_id, "transaction_tags", f"{txn_id}_{tag_id}", "INSERT",
                         after_state=json.dumps({"transaction_id": txn_id, "tag_id": tag_id}))
+
+
+def _execute_bulk_untag(conn, mutation_id, transaction_ids, params):
+    tag_name = params.get("tag_name", "")
+    tag_row = conn.execute("SELECT id FROM tags WHERE name = ?", (tag_name,)).fetchone()
+    if not tag_row:
+        return
+    tag_id = tag_row["id"]
+
+    for txn_id in transaction_ids:
+        row = conn.execute("SELECT * FROM transaction_tags WHERE transaction_id = ? AND tag_id = ?", (txn_id, tag_id)).fetchone()
+        if row:
+            conn.execute("DELETE FROM transaction_tags WHERE transaction_id = ? AND tag_id = ?", (txn_id, tag_id))
+            _log_change(conn, mutation_id, "transaction_tags", f"{txn_id}_{tag_id}", "DELETE",
+                        before_state=json.dumps(dict(row)))
+
+
+def _execute_hide(conn, mutation_id, transaction_ids, params):
+    target = 1 if params.get("hidden", True) else 0
+    for txn_id in transaction_ids:
+        before = _snapshot_row(conn, "transactions", txn_id)
+        conn.execute("UPDATE transactions SET is_hidden = ?, updated_at = datetime('now') WHERE id = ?", (target, txn_id))
+        after = _snapshot_row(conn, "transactions", txn_id)
+        _log_change(conn, mutation_id, "transactions", txn_id, "UPDATE", before, after)
+
+
+def _execute_override(conn, mutation_id, transaction_ids, params):
+    # Back-compat: wrap a legacy single-triple into the changes list.
+    changes = params.get("changes")
+    if not changes and params.get("transaction_id") is not None:
+        changes = [{"transaction_id": params.get("transaction_id"), "field": params.get("field"),
+                    "new_canonical": params.get("new_canonical"), "note": params.get("note")}]
+    for ch in (changes or []):
+        txn_id = ch["transaction_id"]
+        before = _snapshot_row(conn, "transactions", txn_id)
+        override_row = apply_field_update(conn, txn_id, ch["field"], ch.get("new_canonical"),
+                                          note=ch.get("note"), author_type="aurelia")
+        if override_row is None:
+            continue  # value already matched; nothing to log
+        after = _snapshot_row(conn, "transactions", txn_id)
+        _log_change(conn, mutation_id, "transactions", txn_id, "UPDATE", before, after)
+        # Log the audit-row insert too, so undo removes it along with the field change.
+        _log_change(conn, mutation_id, "transaction_overrides", override_row["id"], "INSERT",
+                    after_state=json.dumps(dict(override_row)))
 
 
 def _execute_bulk_recategorize(conn, mutation_id, transaction_ids, params):

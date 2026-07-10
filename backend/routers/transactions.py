@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from typing import Optional
 from pydantic import BaseModel
 from backend.database import get_db
-from backend.models import TransactionResponse, TransactionUpdate, BulkTransactionUpdate
+from backend.models import TransactionResponse, TransactionUpdate, BulkTransactionUpdate, OverrideRevertRequest
 from backend.services.categorization import categorize_transactions
+from backend.services.overrides import apply_field_update
 
 router = APIRouter()
 
@@ -28,6 +29,8 @@ def list_transactions(
     max_amount: Optional[int] = None,
     is_transfer: Optional[bool] = None,
     needs_review: Optional[bool] = None,
+    uncategorized: Optional[bool] = None,
+    is_suspected_duplicate: Optional[bool] = None,
     show_hidden: Optional[bool] = False,
     sort_by: str = "date",
     sort_dir: str = "desc",
@@ -51,6 +54,8 @@ def list_transactions(
         if category_id is not None:
             conditions.append("t.category_id = ?")
             params.append(category_id)
+        if uncategorized:
+            conditions.append("t.category_id IS NULL AND t.is_transfer = 0")
         if tier_id is not None:
             conditions.append("(t.tier_id = ? OR (t.tier_id IS NULL AND c.default_tier_id = ?))")
             params.extend([tier_id, tier_id])
@@ -78,6 +83,8 @@ def list_transactions(
         if needs_review is not None:
             conditions.append("t.needs_review = ?")
             params.append(1 if needs_review else 0)
+        if is_suspected_duplicate:
+            conditions.append("t.is_suspected_duplicate = 1")
 
         where = " AND ".join(conditions) if conditions else "1=1"
 
@@ -90,8 +97,8 @@ def list_transactions(
         # Count total + aggregates (exclude confirmed transfers from spend/income sums, matching dashboard logic)
         agg_sql = f"""
             SELECT COUNT(*) as cnt,
-                   COALESCE(SUM(CASE WHEN (t.is_transfer = 0 OR t.needs_review = 1) AND t.amount_cents < 0 THEN t.amount_cents ELSE 0 END), 0) as total_spend,
-                   COALESCE(SUM(CASE WHEN (t.is_transfer = 0 OR t.needs_review = 1) AND t.amount_cents > 0 THEN t.amount_cents ELSE 0 END), 0) as total_income
+                   COALESCE(SUM(CASE WHEN t.is_transfer = 0 AND t.amount_cents < 0 THEN t.amount_cents ELSE 0 END), 0) as total_spend,
+                   COALESCE(SUM(CASE WHEN t.is_transfer = 0 AND t.amount_cents > 0 THEN t.amount_cents ELSE 0 END), 0) as total_income
             FROM transactions t
             LEFT JOIN categories c ON t.category_id = c.id
             WHERE {where}
@@ -105,8 +112,8 @@ def list_transactions(
         monthly_sql = f"""
             SELECT strftime('%Y-%m', t.date) as month,
                    COUNT(*) as count,
-                   COALESCE(SUM(CASE WHEN (t.is_transfer = 0 OR t.needs_review = 1) AND t.amount_cents < 0 THEN t.amount_cents ELSE 0 END), 0) as spend,
-                   COALESCE(SUM(CASE WHEN (t.is_transfer = 0 OR t.needs_review = 1) AND t.amount_cents > 0 THEN t.amount_cents ELSE 0 END), 0) as income
+                   COALESCE(SUM(CASE WHEN t.is_transfer = 0 AND t.amount_cents < 0 THEN t.amount_cents ELSE 0 END), 0) as spend,
+                   COALESCE(SUM(CASE WHEN t.is_transfer = 0 AND t.amount_cents > 0 THEN t.amount_cents ELSE 0 END), 0) as income
             FROM transactions t
             LEFT JOIN categories c ON t.category_id = c.id
             WHERE {where}
@@ -124,6 +131,7 @@ def list_transactions(
                    GROUP_CONCAT(DISTINCT tp.project_id) as project_ids,
                    GROUP_CONCAT(DISTINCT tt.tag_id) as tag_ids,
                    (SELECT COUNT(*) FROM transaction_notes tn WHERE tn.transaction_id = t.id) as note_count,
+                   (SELECT COUNT(*) FROM transaction_overrides ov WHERE ov.transaction_id = t.id) as override_count,
                    dup.date as dup_original_date, dup.description as dup_original_description,
                    dup.amount_cents as dup_original_amount, dup_s.filename as dup_original_statement, dup_s.id as dup_original_statement_id
             FROM transactions t
@@ -160,34 +168,28 @@ def update_transaction(transaction_id: int, update: TransactionUpdate):
         if not existing:
             raise HTTPException(status_code=404, detail="Transaction not found")
 
-        updates = {}
-        if update.category_id is not None:
-            updates["category_id"] = update.category_id
-            updates["categorization_status"] = "manual"
-        if update.tier_id is not None:
-            updates["tier_id"] = update.tier_id
-            updates["categorization_status"] = "manual"
-        if update.is_transfer is not None:
-            updates["is_transfer"] = 1 if update.is_transfer else 0
-        if update.needs_review is not None:
-            updates["needs_review"] = 1 if update.needs_review else 0
+        # Map provided fields to canonical column values. Every changed field is
+        # applied and recorded as an audited override (with the optional note).
+        candidates = {
+            "category_id": update.category_id,
+            "tier_id": update.tier_id,
+            "is_transfer": None if update.is_transfer is None else (1 if update.is_transfer else 0),
+            "needs_review": None if update.needs_review is None else (1 if update.needs_review else 0),
+            "date": update.date,
+            "description": update.description,
+            "amount_cents": update.amount_cents,
+        }
 
-        if not updates:
-            return dict(existing)
+        try:
+            for field_name, value in candidates.items():
+                if value is None:
+                    continue
+                apply_field_update(conn, transaction_id, field_name, value,
+                                   note=update.note, author_type="user")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
-        updates["updated_at"] = "placeholder"
-        set_clause = ", ".join(
-            f"{k} = datetime('now')" if k == "updated_at" else f"{k} = ?"
-            for k in updates
-        )
-        values = [v for k, v in updates.items() if k != "updated_at"]
-
-        conn.execute(
-            f"UPDATE transactions SET {set_clause} WHERE id = ?",
-            (*values, transaction_id),
-        )
         conn.commit()
-
         row = conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)).fetchone()
         return dict(row)
     finally:
@@ -202,6 +204,27 @@ def pending_count():
             "SELECT COUNT(*) as count FROM transactions WHERE categorization_status = 'pending' AND is_transfer = 0"
         ).fetchone()
         return {"count": row["count"]}
+    finally:
+        conn.close()
+
+
+@router.get("/counts")
+def transaction_counts():
+    """Whole-dataset counts for the transaction tabs and the dashboard banner."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            """
+            SELECT
+              COALESCE(SUM(CASE WHEN is_transfer = 1 AND needs_review = 1 THEN 1 ELSE 0 END), 0) AS suspected_transfers,
+              COALESCE(SUM(CASE WHEN category_id IS NULL AND is_transfer = 0 THEN 1 ELSE 0 END), 0) AS uncategorized,
+              COALESCE(SUM(CASE WHEN is_suspected_duplicate = 1 THEN 1 ELSE 0 END), 0) AS duplicates,
+              COALESCE(SUM(CASE WHEN needs_review = 1 THEN 1 ELSE 0 END), 0) AS needs_review
+            FROM transactions
+            WHERE is_hidden = 0
+            """
+        ).fetchone()
+        return dict(row)
     finally:
         conn.close()
 
@@ -363,6 +386,53 @@ def hide_transactions(req: HideTransactionsRequest):
         )
         conn.commit()
         return {"status": "ok", "count": cursor.rowcount, "hidden": req.hidden}
+    finally:
+        conn.close()
+
+
+# --- Transaction Overrides (field-level audit trail) ---
+
+@router.get("/{transaction_id}/overrides")
+def get_transaction_overrides(transaction_id: int):
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM transactions WHERE id = ?", (transaction_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        rows = conn.execute(
+            "SELECT * FROM transaction_overrides WHERE transaction_id = ? ORDER BY created_at ASC, id ASC",
+            (transaction_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/{transaction_id}/overrides/revert")
+def revert_transaction_override(transaction_id: int, req: OverrideRevertRequest):
+    """Revert a field to its earliest recorded original value, logging a new override."""
+    conn = get_db()
+    try:
+        if not conn.execute("SELECT id FROM transactions WHERE id = ?", (transaction_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Transaction not found")
+        earliest = conn.execute(
+            "SELECT old_value FROM transaction_overrides WHERE transaction_id = ? AND field_name = ? ORDER BY created_at ASC, id ASC LIMIT 1",
+            (transaction_id, req.field_name),
+        ).fetchone()
+        if not earliest:
+            raise HTTPException(status_code=404, detail=f"No override history for field '{req.field_name}'")
+
+        original = earliest["old_value"]
+        # Restore canonical type for numeric fields (stored as TEXT).
+        if req.field_name in ("amount_cents", "category_id", "tier_id", "is_transfer", "needs_review"):
+            original = None if original is None else int(original)
+        try:
+            result = apply_field_update(conn, transaction_id, req.field_name, original,
+                                       note="Reverted to original", author_type="user")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        conn.commit()
+        row = conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)).fetchone()
+        return {"reverted": result is not None, "transaction": dict(row)}
     finally:
         conn.close()
 

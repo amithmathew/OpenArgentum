@@ -8,7 +8,7 @@ from sse_starlette.sse import EventSourceResponse
 from google.genai import types
 
 from backend.database import get_db
-from backend.services.gemini_client import get_client
+from backend.services.gemini_client import get_client, call_with_backoff
 from backend.services.chat_tools import execute_tool, TOOL_DESCRIPTIONS
 from backend.services.mutations import propose_mutation
 from backend.config import get_active_model
@@ -80,6 +80,7 @@ TOOL_DECLARATIONS = [
                 "max_amount_cents": types.Schema(type="INTEGER", description="Maximum amount in cents"),
                 "categorization_status": types.Schema(type="STRING", description="Filter by categorization status: 'pending', 'auto', or 'manual'"),
                 "uncategorized": types.Schema(type="BOOLEAN", description="If true, return only transactions with no category assigned"),
+                "needs_review": types.Schema(type="BOOLEAN", description="If true, return only transactions still pending review — for transfers this means suspected/unconfirmed ones"),
                 "limit": types.Schema(type="INTEGER", description="Max results to return (default 25)"),
             },
         ),
@@ -168,6 +169,7 @@ TOOL_DECLARATIONS = [
                 "account_name": types.Schema(type="STRING", description="Filter by account name or institution name"),
                 "search": types.Schema(type="STRING", description="Search text filter"),
                 "is_transfer": types.Schema(type="BOOLEAN", description="Filter transfers"),
+                "uncategorized": types.Schema(type="BOOLEAN", description="If true, show only transactions with no category assigned"),
             },
         ),
     ),
@@ -190,6 +192,63 @@ TOOL_DECLARATIONS = [
                 "is_transfer": types.Schema(type="BOOLEAN", description="Filter: transfers only"),
             },
             required=["tag_name"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="propose_bulk_untag",
+        description="Propose removing a tag from transactions. Targets specific transactions by transaction_ids, or all transactions matching the filters — whichever is provided. Only transactions that currently have the tag are affected. Creates a proposal for user approval.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "tag_name": types.Schema(type="STRING", description="Tag to remove"),
+                "transaction_ids": types.Schema(type="ARRAY", items=types.Schema(type="INTEGER"), description="Specific transaction IDs to remove the tag from"),
+                "date_from": types.Schema(type="STRING", description="Filter: start date"),
+                "date_to": types.Schema(type="STRING", description="Filter: end date"),
+                "categories": types.Schema(type="ARRAY", items=types.Schema(type="STRING"), description="Filter: category names"),
+                "account_id": types.Schema(type="INTEGER", description="Filter: account ID (if known)"),
+                "account_name": types.Schema(type="STRING", description="Filter: account name or institution"),
+                "search_text": types.Schema(type="STRING", description="Filter: search in descriptions"),
+                "min_amount_cents": types.Schema(type="INTEGER", description="Filter: minimum amount"),
+                "max_amount_cents": types.Schema(type="INTEGER", description="Filter: maximum amount"),
+                "is_transfer": types.Schema(type="BOOLEAN", description="Filter: transfers only"),
+            },
+            required=["tag_name"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="propose_override",
+        description="Propose correcting one or more fields on one or more transactions as a single approval set (e.g. fix several mis-transcribed descriptions, or correct a wrong amount and date). Each change is a separate {transaction_id, field, new_value} entry — they can target different transactions and different fields. The user reviews and approves the whole set at once; original values are preserved for audit. Prefer this for a handful of distinct corrections; for the same category/tag/transfer applied to many transactions, use the dedicated bulk tools instead.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "changes": types.Schema(
+                    type="ARRAY",
+                    description="The set of edits to apply, each reviewed and approved together.",
+                    items=types.Schema(
+                        type="OBJECT",
+                        properties={
+                            "transaction_id": types.Schema(type="INTEGER", description="Transaction to correct"),
+                            "field": types.Schema(type="STRING", description="Field to override: one of date, description, amount_cents, category_id, tier_id, is_transfer, needs_review. description_raw is NOT editable — it is the permanent record of what was read off the statement."),
+                            "new_value": types.Schema(type="STRING", description="New value in human form: a category/tier NAME, an amount in dollars (e.g. -266.49), a date (YYYY-MM-DD), yes/no for is_transfer/needs_review, or plain text for descriptions"),
+                            "note": types.Schema(type="STRING", description="Optional reason for this specific change (kept in the audit trail)"),
+                        },
+                        required=["transaction_id", "field", "new_value"],
+                    ),
+                ),
+            },
+            required=["changes"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="propose_hide",
+        description="Propose hiding (excluding) one or more transactions from ALL reports and calculations — use for duplicates, bad imports, or anything that should not count toward totals. Hidden transactions are soft-deleted (fully reversible), not permanently removed. Pass hidden=false to un-hide. Creates a proposal for user approval.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "transaction_ids": types.Schema(type="ARRAY", items=types.Schema(type="INTEGER"), description="Transactions to hide (or un-hide)"),
+                "hidden": types.Schema(type="BOOLEAN", description="True to hide/exclude (default), false to restore"),
+            },
+            required=["transaction_ids"],
         ),
     ),
     types.FunctionDeclaration(
@@ -396,7 +455,10 @@ RULES:
 
 MUTATIONS:
 - You can propose changes to the database using the propose_* tools. These create proposals that the user must approve before execution.
-- When the user asks to tag, categorize, mark transfers, create entities, or assign projects, use the appropriate propose_* tool.
+- When the user asks to tag, remove/untag a tag, categorize, mark transfers, create entities, or assign projects, use the appropriate propose_* tool.
+- To remove a tag, use propose_bulk_untag. It works on specific transactions (pass transaction_ids — e.g. ones you just found for the user) or on all transactions matching filters.
+- To exclude transactions from all totals and reports (duplicates, bad imports, anything that shouldn't count), use propose_hide with the transaction_ids. Hiding is a reversible soft-delete; pass hidden=false to restore. Prefer hiding a true duplicate over marking it a transfer.
+- To correct wrong fields (e.g. mis-transcribed descriptions, wrong amounts/dates/categories), use propose_override with a `changes` list — you can bundle several distinct corrections (different transactions and/or different fields) into ONE approval set that the user reviews and approves together. Each change gives a transaction_id, a field, a new_value in human form (category/tier name, dollars, YYYY-MM-DD, or yes/no), and an optional note. The original values are always kept for audit. For applying the SAME category/tag/transfer to many transactions, prefer the dedicated bulk tools. There is a limit on how many changes one set may contain; if you exceed it, split into multiple sets.
 - The proposal will show affected transactions for user review. The user approves or rejects via UI buttons.
 - After a proposal is created, tell the user what you've proposed and that they need to approve it. Do NOT assume it will be automatically executed.
 - Use existing category/tag/project names when possible. Only propose creating new ones when no existing option fits.
@@ -414,7 +476,8 @@ ANALYSIS SANDBOX:
 - Use the sandbox for multi-step analysis: create temp tables to stage intermediate results, then query them.
 - The sandbox is isolated — nothing you do there affects the main database.
 - The sandbox auto-refreshes when the main data changes. If your temp tables disappear, re-create them using the SQL from your conversation history.
-- KEY TABLES: transactions (date, description, description_raw, amount_cents, category_id, tier_id, account_id, is_transfer), categories (id, name), spend_tiers (id, name), accounts (id, name, institution), tags (id, name), transaction_tags (transaction_id, tag_id), projects (id, name), transaction_projects (transaction_id, project_id), transaction_notes (id, transaction_id, author_type, content, created_at)
+- KEY TABLES: transactions (date, description, description_raw, amount_cents, category_id, tier_id, account_id, is_transfer, needs_review),
+- TRANSFER MODEL: is_transfer=1 marks a transfer; ALL transfers are excluded from spending/income totals. needs_review=1 on a transfer means it is SUSPECTED/UNCONFIRMED (pending the user's review); needs_review=0 means the user has already confirmed it. So "transfers flagged as possible / needing review" = is_transfer=1 AND needs_review=1. categories (id, name), spend_tiers (id, name), accounts (id, name, institution), tags (id, name), transaction_tags (transaction_id, tag_id), projects (id, name), transaction_projects (transaction_id, project_id), transaction_notes (id, transaction_id, author_type, content, created_at)
 - Prefer the sandbox for complex analysis over the simpler read-only tools when the question requires multiple steps or intermediate state.
 
 BEHAVIOR:
@@ -615,7 +678,7 @@ async def send_message(session_id: int, req: SendMessageRequest, request: Reques
             chat = client.chats.create(model=get_active_model(), config=config, history=history)
 
             # Send user message
-            response = chat.send_message(req.message)
+            response = call_with_backoff(chat.send_message, req.message)
 
             # Tool loop
             tool_calls_made = []
@@ -624,7 +687,7 @@ async def send_message(session_id: int, req: SendMessageRequest, request: Reques
             proposals_made = []
             navigation = None
 
-            for round_num in range(5):
+            for round_num in range(8):
                 # Check for function calls
                 function_calls = []
                 if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
@@ -656,6 +719,9 @@ async def send_message(session_id: int, req: SendMessageRequest, request: Reques
                     if tool_name.startswith("propose_"):
                         intent_map = {
                             "propose_bulk_tag": "bulk_tag",
+                            "propose_bulk_untag": "bulk_untag",
+                            "propose_override": "override",
+                            "propose_hide": "hide",
                             "propose_bulk_recategorize": "bulk_recategorize",
                             "propose_mark_transfer": "mark_transfer",
                             "propose_assign_project": "assign_project",
@@ -722,9 +788,9 @@ async def send_message(session_id: int, req: SendMessageRequest, request: Reques
                     if tool_name == "generate_chart":
                         charts.append(result)
                         yield {"data": json.dumps({"type": "chart", "chart": result})}
-                    elif tool_name == "navigate_to_transactions":
+                    elif tool_name == "navigate_to_transactions" and result.get("path"):
                         navigation = result
-                        yield {"data": json.dumps({"type": "navigation", "path": result["path"], "params": result["params"]})}
+                        yield {"data": json.dumps({"type": "navigation", "path": result["path"], "params": result.get("params", {})})}
 
                     round_responses.append({"name": tool_name, "result": _summarize_tool_result(tool_name, result)})
                     response_parts.append(
@@ -738,7 +804,7 @@ async def send_message(session_id: int, req: SendMessageRequest, request: Reques
                 tool_history_rounds.append({"calls": round_calls, "responses": round_responses})
 
                 # Send all results back to Gemini
-                response = chat.send_message(response_parts)
+                response = call_with_backoff(chat.send_message, response_parts)
 
             # Extract final text
             final_text = ""
@@ -770,15 +836,34 @@ async def send_message(session_id: int, req: SendMessageRequest, request: Reques
                         else:
                             part_types.append(f"unknown:{type(p).__name__}")
                 logger.warning(f"Gemini returned empty text. finish_reason={finish_reason}, parts={part_types}, tool_rounds={len(tool_history_rounds)}")
-                # Last resort: ask Gemini to summarize what it found
+                # Last resort: force a plain-text summary. If we ran out of tool rounds
+                # mid-tool-use, the last turn has function_calls still awaiting responses —
+                # answer them with a "budget reached" note so Gemini can finalize in text.
                 try:
-                    retry_response = chat.send_message("Please summarize your findings in plain text.")
-                    if retry_response.candidates and retry_response.candidates[0].content:
+                    pending_calls = []
+                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                        pending_calls = [p.function_call for p in response.candidates[0].content.parts if p.function_call]
+                    if pending_calls:
+                        budget_parts = [
+                            types.Part.from_function_response(
+                                name=fc.name,
+                                response={"error": "Tool budget reached. Do not call any more tools — summarize your findings for the user now in plain text."},
+                            )
+                            for fc in pending_calls
+                        ]
+                        retry_response = call_with_backoff(chat.send_message, budget_parts)
+                    else:
+                        retry_response = call_with_backoff(chat.send_message, "Please summarize your findings for the user in plain text.")
+                    if retry_response.candidates and retry_response.candidates[0].content and retry_response.candidates[0].content.parts:
                         for part in retry_response.candidates[0].content.parts:
                             if part.text:
                                 final_text += part.text
                 except Exception as e:
                     logger.error(f"Retry for text response also failed: {e}")
+
+            # Absolute fallback so the user always gets a response instead of an empty/timed-out stream.
+            if not final_text:
+                final_text = "I ran several analyses but couldn't put together a final summary this time. Could you try again, or narrow the question a little?"
 
             # Build metadata
             metadata = {}
