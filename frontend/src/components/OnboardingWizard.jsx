@@ -9,6 +9,7 @@ export default function OnboardingWizard({ onComplete }) {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [loadingDemo, setLoadingDemo] = useState(false)
 
   const handleTestLLM = async () => {
     setTesting(true)
@@ -36,6 +37,19 @@ export default function OnboardingWizard({ onComplete }) {
     }
   }
 
+  const handleExploreDemo = async () => {
+    setLoadingDemo(true)
+    try {
+      // Switch to the pre-loaded sample database and skip the key requirement.
+      await api.post('/settings/switch-database', { name: 'demo.db' })
+      await api.post('/settings/complete-onboarding')
+      onComplete()
+    } catch (e) {
+      setTestResult({ ok: false, message: e.message })
+      setLoadingDemo(false)
+    }
+  }
+
   const steps = [
     // Step 0: Welcome
     <div key="welcome" className="text-center">
@@ -50,6 +64,18 @@ export default function OnboardingWizard({ onComplete }) {
       <p className="text-xs mt-4" style={{ color: 'var(--color-text-muted)' }}>
         All your data stays on your device. Nothing is sent to the cloud except LLM queries.
       </p>
+      <div className="mt-5 pt-4" style={{ borderTop: '1px solid var(--color-border-light)' }}>
+        <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
+          Just want to look around first?
+        </p>
+        <button onClick={handleExploreDemo} disabled={loadingDemo}
+          className="theme-btn-secondary w-full py-2 text-sm disabled:opacity-50">
+          {loadingDemo ? 'Loading demo…' : 'Explore with sample data'}
+        </button>
+        <p className="text-[11px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
+          Loads a demo database of realistic transactions — no API key needed. Switch to your own data anytime in Settings.
+        </p>
+      </div>
     </div>,
 
     // Step 1: LLM Setup

@@ -282,9 +282,9 @@ export default function App() {
         setConfigLoaded(true)
         return
       }
-      // Then check onboarding
+      // Then check onboarding — demo mode (--demo) bypasses it entirely
       return api.get('/settings/app-config').then(config => {
-        if (!config.onboarding_complete) {
+        if (!config.onboarding_complete && !config.demo_mode) {
           setShowOnboarding(true)
         }
         setConfigLoaded(true)

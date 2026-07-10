@@ -51,6 +51,7 @@ def get_app_config():
     config = load_app_config()
     return {
         "onboarding_complete": config.get("onboarding_complete", False),
+        "demo_mode": bool(os.getenv("OPENARGENTUM_DEMO")),
         "llm_configured": bool(config.get("gemini_api_key") or config.get("llm_provider") == "adc"),
         "llm_provider": config.get("llm_provider", "none"),
         "chat_model": get_active_model("chat"),

@@ -66,8 +66,12 @@ def get_client() -> genai.Client:
                 location="us-central1",
             )
         except google.auth.exceptions.DefaultCredentialsError:
-            # Last resort: try without any auth (will fail on API call)
-            _client = genai.Client()
+            # No API key and no ADC — surface a clear, actionable message rather
+            # than letting the SDK fail later with a cryptic "missing key" error.
+            raise RuntimeError(
+                "No Gemini API key configured. Add your key in Settings to use AI "
+                "features (statement import and the Aurelia assistant)."
+            )
     return _client
 
 
@@ -78,6 +82,9 @@ def _friendly_error(e: Exception) -> str:
     if any(k in msg for k in ["connectionerror", "connection refused", "name resolution", "nodename nor servname",
                                "network is unreachable", "timed out", "timeout", "dns", "resolve"]):
         return "No internet connection. Ingestion and AI features require an active internet connection."
+
+    if "no gemini api key configured" in msg or "missing key inputs" in msg:
+        return "No Gemini API key configured. Add your key in Settings to use AI features (statement import and the Aurelia assistant)."
 
     if any(k in msg for k in ["api key", "invalid key", "permission denied", "403", "401", "unauthenticated"]):
         return "LLM authentication failed. Check your API key or GCP credentials in Settings."

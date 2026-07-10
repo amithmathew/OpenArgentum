@@ -4,6 +4,14 @@
 
 <h1 align="center">OpenArgentum</h1>
 
+<p align="center">
+  A self-hosted, AI-powered personal finance manager that runs entirely on your own machine.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
+  <a href="https://github.com/amithmathew/OpenArgentum/stargazers"><img src="https://img.shields.io/github/stars/amithmathew/OpenArgentum?style=social" alt="GitHub stars" /></a>
+</p>
 
 - **AI-powered import** -- Drop in your bank statements (PDF, CSV, or ZIP). AI extracts every transaction, assigns categories and tags, and catches duplicates automatically.
 - **Conversational finance** -- Ask Aurelia, your built-in AI assistant, anything about your spending. Get charts, insights, and safe bulk edits through plain English.
@@ -19,17 +27,31 @@
 
 ## Quick Start
 
-**You need:** Python 3, Node.js, and a [free Google Gemini API key](https://aistudio.google.com/apikey) (or existing Google Cloud Application Default Credentials)
+**You need:** Python 3.11+, Node.js 20.19+, and a [free Google Gemini API key](https://aistudio.google.com/apikey) (or existing Google Cloud Application Default Credentials)
 
 ```bash
 git clone https://github.com/amithmathew/OpenArgentum.git
-cd openargentum
+cd OpenArgentum
 ./start.sh
 ```
 
 Open **http://localhost:8099** and the onboarding wizard will walk you through setup.
 
 > **That's it.** `start.sh` creates a Python virtual environment, installs all dependencies, builds the app, and starts the server. See [Getting Started](GETTING_STARTED.md) for a detailed walkthrough.
+
+---
+
+## Try the Demo — no API key needed
+
+Want to look around before importing your own statements? OpenArgentum ships with a sample database of realistic transactions.
+
+1. Clone and launch as shown in [Quick Start](#quick-start) — you can skip the API key step in onboarding for now.
+2. Open **Settings → Databases** and switch to the **Demo** database.
+3. Explore the dashboard, transactions, projects, and charts with pre-loaded data.
+
+> **Fastest path:** run `./start.sh --demo` to boot straight into the demo database with no onboarding and no key required.
+
+Browsing the demo makes no external calls and needs no Gemini key — only statement import and the Aurelia assistant require one. Any changes you make to the demo reset when you restart the server.
 
 ---
 
@@ -153,13 +175,13 @@ Run with `./start.sh --headless` to access OpenArgentum from any device on your 
 
 ## Privacy & Security
 
-Your financial data never leaves your control.
+OpenArgentum stores everything locally and reaches out to exactly one external service, on purpose.
 
-- All data lives in a local SQLite database on your machine -- easy to back up, export, or inspect. It's your data, do what you want with it.
-- No live bank connectivity. OpenArgentum works with statements and exports you already have.
-- The only external call is to Google Gemini for AI processing. No analytics, no telemetry, no tracking.
-- Network access is off by default. When enabled, it's protected by a PIN with brute-force protection.
-- Localhost access is always open without authentication.
+- **Local-first storage.** All your data lives in a SQLite database on your machine — easy to back up, export, or inspect. No cloud sync, no account, no telemetry, no tracking.
+- **One external call, by design.** To read and categorize your statements, the contents of the files you import are sent to the Google Gemini API. That is the only data that leaves your machine, and it only happens for AI features — statement import and the Aurelia assistant. Browsing your existing data makes no external calls.
+- **No live bank connections.** OpenArgentum only works with statements and exports you already have; it never connects to your bank.
+- **Network access is off by default.** When you enable it with `--headless`, it's protected by an auto-generated PIN with brute-force protection.
+- **Localhost is unauthenticated.** Anything running on your machine can reach the app on localhost, so treat your own machine as the trust boundary.
 
 ---
 
@@ -203,6 +225,7 @@ Most users won't need these -- the UI handles everything.
 
 ```
 ./start.sh                         # Start the app
+./start.sh --demo                  # Boot into the demo database (no key, no onboarding)
 ./start.sh --dev                   # Development mode with hot reload
 ./start.sh --headless              # Enable network access (auto-generates PIN)
 ./start.sh --headless --pin 1234   # Network access with a specific PIN

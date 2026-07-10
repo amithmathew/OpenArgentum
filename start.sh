@@ -9,11 +9,16 @@ cd "$(dirname "$0")"
 MODE="production"
 HEADLESS=false
 PIN=""
+DEMO=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --dev)
       MODE="dev"
+      shift
+      ;;
+    --demo)
+      DEMO=true
       shift
       ;;
     --headless)
@@ -32,6 +37,7 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: ./start.sh [flags]"
       echo ""
       echo "Flags:"
+      echo "  --demo       Boot into the demo database (no API key or onboarding required)"
       echo "  --dev        Start in development mode (Vite HMR + uvicorn reload)"
       echo "  --headless   Enable network access with PIN authentication"
       echo "  --pin PIN    Set the network access PIN (used with --headless)"
@@ -39,6 +45,7 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Examples:"
       echo "  ./start.sh                     Production mode, localhost only"
+      echo "  ./start.sh --demo              Explore the sample database, no key needed"
       echo "  ./start.sh --dev               Development mode with hot reload"
       echo "  ./start.sh --headless          Network access with auto-generated PIN"
       echo "  ./start.sh --headless --pin 1234   Network access with specific PIN"
@@ -56,7 +63,7 @@ echo "  ╔═══════════════════════
 echo "  ║       OpenArgentum Setup          ║"
 echo "  ╚═══════════════════════════════════╝"
 echo ""
-echo "  Mode: $MODE$([ "$HEADLESS" = true ] && echo ' + headless')"
+echo "  Mode: $MODE$([ "$HEADLESS" = true ] && echo ' + headless')$([ "$DEMO" = true ] && echo ' + demo')"
 echo ""
 
 # --- Check prerequisites ---
@@ -66,14 +73,29 @@ if ! command -v python3 &> /dev/null; then
     echo "     Install from https://www.python.org/downloads/"
     exit 1
 fi
-echo "  ✓ Python $(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")"
+PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+if ! python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"; then
+    echo "  ✗ Python 3.10+ is required (found $PY_VER)."
+    echo "     Install a newer version from https://www.python.org/downloads/"
+    exit 1
+fi
+echo "  ✓ Python $PY_VER"
 
 if ! command -v node &> /dev/null; then
     echo "  ✗ Node.js is required but not found."
     echo "     Install from https://nodejs.org/"
     exit 1
 fi
-echo "  ✓ Node.js $(node --version)"
+NODE_VER=$(node --version | sed 's/^v//')
+NODE_MAJOR=${NODE_VER%%.*}
+NODE_REST=${NODE_VER#*.}
+NODE_MINOR=${NODE_REST%%.*}
+if [ "$NODE_MAJOR" -lt 20 ] || { [ "$NODE_MAJOR" -eq 20 ] && [ "$NODE_MINOR" -lt 19 ]; }; then
+    echo "  ✗ Node.js 20.19+ is required (found v$NODE_VER)."
+    echo "     Vite 8 needs Node 20.19 or newer. Install the LTS from https://nodejs.org/"
+    exit 1
+fi
+echo "  ✓ Node.js v$NODE_VER"
 
 # --- Python virtual environment ---
 
@@ -215,6 +237,16 @@ echo ""
 
 if [ "$HEADLESS" = true ]; then
     export OPENARGENTUM_HEADLESS=1
+fi
+
+if [ "$DEMO" = true ]; then
+    export OPENARGENTUM_DEMO=1
+    echo "  ┌──────────────────────────────────┐"
+    echo "  │  Demo mode — sample database      │"
+    echo "  │  No API key or onboarding needed  │"
+    echo "  │  Changes reset when you restart   │"
+    echo "  └──────────────────────────────────┘"
+    echo ""
 fi
 
 if [ "$MODE" = "dev" ]; then

@@ -16,14 +16,22 @@ CONFIG_PATH = DATA_DIR / "config.json"
 DEFAULT_DB_NAME = "finance.db"
 
 
+def is_demo_mode() -> bool:
+    """True when the app was launched with --demo (OPENARGENTUM_DEMO=1)."""
+    return bool(os.getenv("OPENARGENTUM_DEMO"))
+
+
 def get_db_path() -> Path:
     """Return path to the currently active database."""
-    active = get_config_value("active_db", DEFAULT_DB_NAME)
-    return DATA_DIR / active
+    return DATA_DIR / get_db_name()
 
 
 def get_db_name() -> str:
     """Return name of the currently active database."""
+    # --demo forces the demo database for the lifetime of the process,
+    # without persisting the choice to config.json.
+    if is_demo_mode():
+        return "demo.db"
     return get_config_value("active_db", DEFAULT_DB_NAME)
 
 # Gemini

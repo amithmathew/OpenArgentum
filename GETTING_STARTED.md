@@ -7,11 +7,17 @@ A step-by-step guide to setting up and using OpenArgentum for managing your pers
 ## What You'll Need
 
 1. **A computer** running macOS, Linux, or Windows (with WSL)
-2. **Python 3** -- [Download here](https://www.python.org/downloads/) if you don't have it
-3. **Node.js** -- [Download here](https://nodejs.org/) (choose the LTS version)
+2. **Python 3.11 or newer** -- [Download here](https://www.python.org/downloads/) if you don't have it (3.10 is the minimum; 3.11+ is recommended)
+3. **Node.js 20.19 or newer** -- [Download here](https://nodejs.org/) (choose the LTS version). Vite 8, which builds the app, requires 20.19+.
 4. **A Google Gemini API key** -- Free at [Google AI Studio](https://aistudio.google.com/apikey). Click "Create API Key" and copy it.
 
-> **Don't have an API key yet?** You can still install the app and add the key later through the Settings page.
+> **Don't have an API key yet?** You can still install the app and add the key later through the Settings page. You can also explore the app with a built-in **demo database** — see [Try the Demo](#try-the-demo-first) below — which needs no key at all.
+
+> **What it costs:** The Gemini free tier is enough for typical personal use, but it has rate limits. Heavy statement imports will queue and process one at a time, and at high volume you could exceed the free tier and spill into paid usage. Browsing your existing data is always free — only statement import and the Aurelia assistant call Gemini.
+
+### Your data & privacy
+
+OpenArgentum stores everything locally in a SQLite database on your machine — no cloud sync, no account, no telemetry. It reaches out to exactly one external service, on purpose: to read and categorize your statements, the contents of the files you import are sent to the Google Gemini API. That is the only data that leaves your machine, and it only happens for AI features (statement import and the Aurelia assistant). Browsing your existing data makes no external calls, and OpenArgentum never connects to your bank.
 
 ---
 
@@ -21,7 +27,7 @@ Open a terminal and run:
 
 ```bash
 git clone https://github.com/amithmathew/OpenArgentum.git
-cd openargentum
+cd OpenArgentum
 ./start.sh
 ```
 
@@ -32,6 +38,18 @@ The script will:
 - Start the server
 
 When you see `OpenArgentum` with a URL in the terminal, open **http://localhost:8099** in your browser.
+
+---
+
+## Try the Demo First
+
+Not ready to import your own statements yet? OpenArgentum ships with a sample database of realistic transactions so you can explore every feature before adding a key.
+
+- **Fastest:** launch with `./start.sh --demo`. This boots straight into the demo database — no onboarding, no API key.
+- **From onboarding:** on first launch, click **Explore with sample data** on the welcome screen.
+- **Anytime:** open **Settings → Databases** and switch to the **Demo** database.
+
+Browsing the demo makes no external calls and needs no Gemini key. Any changes you make to the demo reset when you restart the server, and you can switch back to your own data from Settings whenever you're ready.
 
 ---
 
