@@ -215,7 +215,12 @@ function LLMConfig() {
           }}>GCP ADC</button>
       </div>
       {provider === 'api_key' ? (
-        <input className="theme-input w-full px-3 py-1.5 text-sm mb-3" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste new Gemini API key..." />
+        <>
+          <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
+            Get a free API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a>.
+          </p>
+          <input className="theme-input w-full px-3 py-1.5 text-sm mb-3" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste new Gemini API key..." />
+        </>
       ) : (
         <input className="theme-input w-full px-3 py-1.5 text-sm mb-3" value={gcpProject} onChange={e => setGcpProject(e.target.value)} placeholder="GCP Project ID" />
       )}

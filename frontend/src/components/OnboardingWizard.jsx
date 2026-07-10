@@ -81,9 +81,20 @@ export default function OnboardingWizard({ onComplete }) {
     // Step 1: LLM Setup
     <div key="llm">
       <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--color-text)' }}>Set up AI</h2>
-      <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
         Aurelia needs a Google Gemini API key to work. It's free for personal use.
       </p>
+
+      <div className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-surface-alt)', color: 'var(--color-text-secondary)' }}>
+        <p className="mb-1" style={{ color: 'var(--color-text)' }}>Two features won't work without a key:</p>
+        <ul className="list-disc pl-4 space-y-0.5">
+          <li><strong>Statement import</strong> — extracting and categorizing transactions from PDFs and CSVs</li>
+          <li><strong>Aurelia</strong> — the AI chat assistant</li>
+        </ul>
+        <p className="mt-1.5" style={{ color: 'var(--color-text-muted)' }}>
+          Everything else — the dashboard, and viewing or editing transactions manually — works either way. You can add a key later in Settings.
+        </p>
+      </div>
 
       <div className="flex gap-2 mb-4">
         <button onClick={() => setProvider('api_key')}

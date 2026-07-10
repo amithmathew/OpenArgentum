@@ -567,8 +567,8 @@ function ChatMessage({ msg, onNavigate }) {
           <ToolCallDetails tools={metadata.tool_calls} />
         )}
 
-        {/* Retry button on error messages */}
-        {metadata.isError && metadata.retryMessage && (
+        {/* Retry button on transient errors — not credential errors, where Open Settings is the fix */}
+        {metadata.isError && metadata.retryMessage && !metadata.needsSettings && (
           <button
             onClick={() => { if (msg.onRetry) msg.onRetry(metadata.retryMessage) }}
             className="mt-2 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors"
@@ -578,6 +578,17 @@ function ChatMessage({ msg, onNavigate }) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
             Retry
+          </button>
+        )}
+
+        {/* Open Settings — shown when the error is about missing/invalid API credentials */}
+        {metadata.isError && metadata.needsSettings && (
+          <button
+            onClick={() => onNavigate('/settings')}
+            className="mt-2 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors"
+            style={{ backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent-text)' }}
+          >
+            Open Settings →
           </button>
         )}
       </div>
@@ -711,6 +722,14 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
     }
   }, [open, activeSessionId])
 
+  // Auto-grow the input textarea to fit its content (capped by maxHeight in the style)
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [input])
+
   const handleRetry = (retryMessage) => {
     // Remove the error message and the user message before it, then resend
     setMessages(prev => {
@@ -800,7 +819,7 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
             break
           }
           case 'error':
-            setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: `Error: ${event.error}`, metadata: { isError: true }, onRetry: handleRetry }])
+            setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: `Error: ${event.error}`, metadata: { isError: true, needsSettings: /settings/i.test(event.error || ''), retryMessage: msgToSend }, onRetry: handleRetry }])
             setStatusText('')
             setLiveCharts([])
             break
@@ -810,7 +829,7 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
       await promise
     } catch (err) {
       if (isMyStream()) {
-        setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: `Error: ${err.message}`, metadata: { isError: true }, onRetry: handleRetry }])
+        setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: `Error: ${err.message}`, metadata: { isError: true, needsSettings: /settings/i.test(err.message || ''), retryMessage: msgToSend }, onRetry: handleRetry }])
       }
     } finally {
       // CRITICAL: Only unlock UI if THIS stream is still the active one.
@@ -958,8 +977,8 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
 
   const handleNavigate = (path, params) => {
     if (onNavigate) {
-      const query = new URLSearchParams(params).toString()
-      onNavigate(`${path}?${query}`)
+      const query = params ? new URLSearchParams(params).toString() : ''
+      onNavigate(query ? `${path}?${query}` : path)
     }
   }
 
@@ -1153,10 +1172,12 @@ export default function ChatPanel({ open, fullscreen, onClose, onToggleFullscree
 
           {/* Input */}
           <div className="px-4 py-3 shrink-0" style={{ borderTop: '1px solid var(--color-border-light)', paddingBottom: isMobile ? 'calc(12px + 56px + env(safe-area-inset-bottom, 0px))' : undefined }}>
-            <div className="flex gap-2">
-              <input
+            <div className="flex gap-2 items-end">
+              <textarea
                 ref={inputRef}
-                className="theme-input flex-1 px-3 py-3 md:py-2 text-base md:text-sm"
+                rows={1}
+                className="theme-input flex-1 px-3 py-3 md:py-2 text-base md:text-sm resize-none leading-relaxed"
+                style={{ maxHeight: '160px', overflowY: 'auto' }}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
