@@ -62,7 +62,29 @@ See the **Developer Details** section of the [README](README.md) for a fuller ma
 Open an issue with clear steps to reproduce (for bugs) or a description of the use case
 (for features). Please don't include real financial data or API keys in issues.
 
+## Contributor License Agreement
+
+Contributions are accepted under the project's [AGPL-3.0 license](LICENSE) and require a
+one-time signing of our [Contributor License Agreement](CLA.md) (CLA). You keep ownership
+of your contribution; the CLA grants the maintainer a broad license — including the right
+to relicense — so the project can stay open source while keeping the door open to a
+first-party managed-hosting service later.
+
+**How to sign (it takes one comment):**
+
+1. Open your pull request as usual.
+2. On your **first** PR, a bot ([CLA Assistant](https://github.com/contributor-assistant/github-action))
+   will comment automatically with a link to [CLA.md](CLA.md).
+3. Reply to the PR with this exact phrase:
+
+   ```
+   I have read the CLA Document and I hereby sign the CLA
+   ```
+
+4. The CLA check flips to passing and stays satisfied for all your future PRs. (If it
+   doesn't update immediately, comment `recheck`.)
+
 ## License
 
-By contributing, you agree that your contributions will be licensed under the
-[MIT License](LICENSE) that covers this project.
+By contributing, you agree that your contributions are licensed under the project's
+[GNU AGPL-3.0 license](LICENSE), subject to the terms of the [CLA](CLA.md) above.

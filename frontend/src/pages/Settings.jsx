@@ -850,9 +850,12 @@ export default function Settings() {
             {' · '}
             <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-primary)' }}>How Google uses your data</a>
           </p>
-          <div className="flex gap-4 text-xs">
-            <a href="https://github.com/amithmathew/OpenArgentum" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-primary)' }}>GitHub</a>
-            <span>MIT License</span>
+          <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            OpenArgentum
+            {' · '}
+            <a href="https://github.com/amithmathew/OpenArgentum/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-text-muted)' }}>AGPL-3.0</a>
+            {' · '}
+            <a href="https://github.com/amithmathew/OpenArgentum" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-text-muted)' }}>Source</a>
           </div>
         </div>
       </div>

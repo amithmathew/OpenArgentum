@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" /></a>
   <a href="https://github.com/amithmathew/OpenArgentum/stargazers"><img src="https://img.shields.io/github/stars/amithmathew/OpenArgentum?style=social" alt="GitHub stars" /></a>
 </p>
 
@@ -312,6 +312,27 @@ openargentum/
 <p>This starts the Vite dev server with hot module replacement and the backend with auto-reload. The Vite dev server proxies <code>/api</code> requests to the backend.</p>
 
 </details>
+
+---
+
+## License & Project Model
+
+OpenArgentum is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+- **Self-hosting is free and always will be.** The self-hosted version is fully featured
+  — no locked features, no "premium" tier, no crippled free build. You run it, you own
+  your data, and you supply your own model API key (or point it at a local model).
+- **A managed hosting option may be offered in the future** for people who'd rather not
+  run it themselves. Because hosting and AI inference carry real, ongoing costs, a
+  managed service would be paid — for everyone who uses it. This does not affect the
+  self-hosted version, which stays free and complete.
+- **The code is genuinely open source.** AGPL lets you inspect, modify, and self-host
+  freely. It also means anyone offering a modified version as a network service must
+  share their changes back, keeping improvements in the commons.
+
+Contributions are welcome — they require signing our [Contributor License Agreement](CLA.md)
+(a one-time comment on your first pull request). See [LICENSE_FAQ.md](LICENSE_FAQ.md) and
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
