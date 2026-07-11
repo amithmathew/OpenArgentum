@@ -13,6 +13,14 @@
   <a href="https://github.com/amithmathew/OpenArgentum/stargazers"><img src="https://img.shields.io/github/stars/amithmathew/OpenArgentum?style=social" alt="GitHub stars" /></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/amithmathew/OpenArgentum"><strong>GitHub Repository</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/amithmathew/OpenArgentum/blob/main/GETTING_STARTED.md">Getting Started</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/amithmathew/OpenArgentum/issues">Report an Issue</a>
+</p>
+
 - **AI-powered import** -- Drop in your bank statements (PDF, CSV, or ZIP). AI extracts every transaction, assigns categories and tags, and catches duplicates automatically.
 - **Conversational finance** -- Ask Aurelia, your built-in AI assistant, anything about your spending. Get charts, insights, and safe bulk edits through plain English.
 - **Your data, no lock-in** -- All data lives in a local SQLite database on your machine. No cloud sync, no account, no telemetry. You own your data and can do whatever you want with it.
