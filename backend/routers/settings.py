@@ -149,6 +149,26 @@ def setup_llm(req: SetupLLMRequest):
         raise HTTPException(status_code=400, detail="Invalid provider")
 
 
+@router.post("/disconnect-llm")
+def disconnect_llm():
+    """Clear the configured AI provider — returns to the 'not configured' state.
+
+    Removes any saved API key / ADC selection / project so AI features refuse
+    gracefully until a provider is configured again.
+    """
+    config = load_app_config()
+    for key in ("llm_provider", "gemini_api_key", "gcp_project"):
+        config.pop(key, None)
+    save_app_config(config)
+    # Also drop the process-level key so it isn't picked up for the rest of this run.
+    os.environ.pop("GOOGLE_API_KEY", None)
+    # Reset the cached client so the next call re-resolves credentials.
+    import backend.services.gemini_client as gc
+    gc._client = None
+    logger.info("AI provider disconnected — configuration cleared")
+    return {"status": "ok", "message": "AI provider disconnected"}
+
+
 @router.post("/complete-onboarding")
 def complete_onboarding():
     """Mark onboarding as complete."""

@@ -175,12 +175,20 @@ function LLMConfig() {
     setTesting(true)
     setResult(null)
     try {
-      const body = provider === 'api_key'
-        ? { provider: 'api_key', api_key: apiKey }
-        : { provider: 'adc', gcp_project: gcpProject || null }
-      const res = await api.post('/settings/setup-llm', body)
-      setResult({ ok: true, message: res.message })
+      if (provider === 'off') {
+        await api.post('/settings/disconnect-llm')
+        setResult({ ok: true, message: 'AI features turned off' })
+      } else {
+        const body = provider === 'api_key'
+          ? { provider: 'api_key', api_key: apiKey }
+          : { provider: 'adc', gcp_project: gcpProject || null }
+        const res = await api.post('/settings/setup-llm', body)
+        setResult({ ok: true, message: res.message })
+      }
       setApiKey('')
+      setGcpProject('')
+      const c = await api.get('/settings/app-config')
+      setConfig(c)
     } catch (e) {
       setResult({ ok: false, message: e.message })
     } finally {
@@ -237,6 +245,12 @@ function LLMConfig() {
             backgroundColor: provider === 'adc' ? 'var(--color-accent-light)' : 'var(--color-surface-alt)',
             color: provider === 'adc' ? 'var(--color-accent-text)' : 'var(--color-text-secondary)',
           }}>GCP ADC</button>
+        <button onClick={() => setProvider('off')}
+          className="px-3 py-1 text-xs font-medium rounded-lg"
+          style={{
+            backgroundColor: provider === 'off' ? 'var(--color-accent-light)' : 'var(--color-surface-alt)',
+            color: provider === 'off' ? 'var(--color-accent-text)' : 'var(--color-text-secondary)',
+          }}>Off</button>
       </div>
       {provider === 'api_key' ? (
         <>
@@ -245,11 +259,15 @@ function LLMConfig() {
           </p>
           <input className="theme-input w-full px-3 py-1.5 text-sm mb-3" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste new Gemini API key..." />
         </>
-      ) : (
+      ) : provider === 'adc' ? (
         <input className="theme-input w-full px-3 py-1.5 text-sm mb-3" value={gcpProject} onChange={e => setGcpProject(e.target.value)} placeholder="GCP Project ID" />
+      ) : (
+        <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
+          Turn off AI features. This clears your saved provider — Aurelia and statement import stop working, and no data is sent to Google. Everything else keeps working. You can reconnect anytime.
+        </p>
       )}
-      <button onClick={handleSave} disabled={testing || (provider === 'api_key' && !apiKey.trim())} className="theme-btn-primary px-4 py-1.5 text-sm disabled:opacity-50">
-        {testing ? 'Testing...' : 'Test & Save'}
+      <button onClick={handleSave} disabled={testing || (provider === 'api_key' && !apiKey.trim()) || (provider === 'off' && !config?.llm_configured)} className="theme-btn-primary px-4 py-1.5 text-sm disabled:opacity-50">
+        {testing ? (provider === 'off' ? 'Turning off...' : 'Testing...') : (provider === 'off' ? 'Turn off AI' : 'Test & Save')}
       </button>
       {result && (
         <div className="mt-2 text-xs" style={{ color: result.ok ? 'var(--color-success)' : 'var(--color-danger)' }}>
