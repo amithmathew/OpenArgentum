@@ -203,19 +203,23 @@ function LLMConfig() {
         </span>
       </div>
 
-      <div className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
-        <p className="mb-1 font-semibold" style={{ color: 'var(--color-text)' }}>How Google handles your data</p>
-        <p className="mb-1.5">
-          Your statements are sent to Google Gemini. We recommend Google's <strong>paid</strong> data terms — enable{' '}
-          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Cloud Billing</a>{' '}
-          on your API key's project, or use GCP credentials (Vertex AI). Under the paid terms, Google <strong>doesn't use your prompts or responses to train its models</strong> or have them reviewed by humans, and processes them under its{' '}
-          <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Data Processing Addendum</a>. Billing status — not spend — is what applies these terms, so you can stay within the free quota.
+      <div className="text-xs mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
+        <p className="mb-2">
+          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. How Google may use that data depends on your tier, so <strong>for real financial data we recommend Google's paid terms</strong>:
         </p>
-        <p className="mb-1.5">
-          A free key with no billing uses the <strong>unpaid</strong> tier, where Google uses your content to improve its products and human reviewers may read it. Google's terms state: <em>“Do not submit sensitive, confidential, or personal information to the Unpaid Services.”</em> Bank statements are exactly that, so we don't recommend the free tier for real financial data.
-        </p>
+        <ul className="space-y-1.5 mb-2 list-none">
+          <li>
+            <strong style={{ color: 'var(--color-text)' }}>✓ Real statements:</strong> enable{' '}
+            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Cloud Billing</a>{' '}
+            on your key's project, or use GCP credentials (Vertex AI). Under Google's current paid terms, they say your data isn't used to train their models or seen by human reviewers, and is processed under their{' '}
+            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Data Processing Addendum</a>. Billing <em>status</em>, not spend, applies these terms — you can stay within the free quota.
+          </li>
+          <li>
+            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> fine for the demo and trying things out. Under Google's free terms your content may be used to improve its products and may be human-reviewed — their terms even say <em>“Do not submit sensitive, confidential, or personal information to the Unpaid Services.”</em> Bank statements are exactly that, so we don't recommend it for real statements.
+          </li>
+        </ul>
         <p style={{ color: 'var(--color-text-muted)' }}>
-          These terms are Google's and can change at any time — you're responsible for reviewing the current{' '}
+          These are Google's terms, not ours, and can change at any time — review the current{' '}
           <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Gemini API terms</a>.
         </p>
       </div>
