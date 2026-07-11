@@ -54,6 +54,7 @@ def get_app_config():
         "demo_mode": bool(os.getenv("OPENARGENTUM_DEMO")),
         "llm_configured": bool(config.get("gemini_api_key") or config.get("llm_provider") == "adc"),
         "llm_provider": config.get("llm_provider", "none"),
+        "gcp_project": config.get("gcp_project"),
         "chat_model": get_active_model("chat"),
         "document_model": get_active_model("document"),
         "network_sharing": config.get("network_sharing", False),
@@ -132,16 +133,16 @@ def setup_llm(req: SetupLLMRequest):
         try:
             import google.auth
             credentials, project = google.auth.default()
-            if not project and not req.gcp_project:
+            resolved_project = req.gcp_project or project
+            if not resolved_project:
                 raise Exception("No project found in ADC. Please provide a GCP project ID.")
             set_config_value("llm_provider", "adc")
-            if req.gcp_project:
-                set_config_value("gcp_project", req.gcp_project)
+            set_config_value("gcp_project", resolved_project)
             # Reset cached client
             import backend.services.gemini_client as gc
             gc._client = None
-            logger.info(f"LLM configured: GCP ADC (project: {req.gcp_project or 'default'})")
-            return {"status": "ok", "message": "ADC configured successfully"}
+            logger.info(f"LLM configured: GCP ADC (project: {resolved_project})")
+            return {"status": "ok", "message": f"ADC configured successfully (project: {resolved_project})"}
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"ADC test failed: {str(e)}")
     else:

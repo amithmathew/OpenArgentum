@@ -80,22 +80,32 @@ def get_client() -> genai.Client:
             _client = genai.Client(api_key=api_key)
             return _client
 
-        # Priority 2: ADC (Vertex AI)
-        try:
-            credentials, project = google.auth.default()
-            gcp_project = get_config_value("gcp_project") or project
-            _client = genai.Client(
-                vertexai=True,
-                project=gcp_project,
-                location="us-central1",
-            )
-        except google.auth.exceptions.DefaultCredentialsError:
-            # No API key and no ADC — surface a clear, actionable message rather
-            # than letting the SDK fail later with a cryptic "missing key" error.
-            raise RuntimeError(
-                "No Gemini API key configured. Add your key in Settings to use AI "
-                "features (statement import and the Aurelia assistant)."
-            )
+        # Priority 2: Google Cloud ADC (Vertex AI) — only when the user has
+        # explicitly opted in (llm_provider == "adc"). We never silently fall
+        # back to ambient machine credentials, so a fresh install (and demo
+        # mode) makes no AI calls until a provider is configured.
+        if get_config_value("llm_provider") == "adc":
+            try:
+                credentials, project = google.auth.default()
+                gcp_project = get_config_value("gcp_project") or project
+                _client = genai.Client(
+                    vertexai=True,
+                    project=gcp_project,
+                    location="us-central1",
+                )
+                return _client
+            except google.auth.exceptions.DefaultCredentialsError:
+                raise RuntimeError(
+                    "Google Cloud ADC not found. Run `gcloud auth application-default "
+                    "login`, or add a Gemini API key in Settings."
+                )
+
+        # No API key, and ADC was not explicitly selected — surface a clear,
+        # actionable message rather than a cryptic SDK failure later.
+        raise RuntimeError(
+            "No Gemini API key configured. Add your key in Settings to use AI "
+            "features (statement import and the Aurelia assistant)."
+        )
     return _client
 
 
@@ -109,6 +119,9 @@ def _friendly_error(e: Exception) -> str:
 
     if "no gemini api key configured" in msg or "missing key inputs" in msg:
         return "No Gemini API key configured. Add your key in Settings to use AI features (statement import and the Aurelia assistant)."
+
+    if "google cloud adc not found" in msg:
+        return "Google Cloud ADC not found. Run `gcloud auth application-default login`, or add a Gemini API key in Settings."
 
     if any(k in msg for k in ["api key", "invalid key", "permission denied", "403", "401", "unauthenticated"]):
         return "LLM authentication failed. Check your API key or GCP credentials in Settings."

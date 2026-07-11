@@ -197,7 +197,9 @@ function LLMConfig() {
           backgroundColor: config?.llm_configured ? 'var(--color-badge-auto-bg)' : 'var(--color-warning-bg)',
           color: config?.llm_configured ? 'var(--color-success)' : 'var(--color-warning)',
         }}>
-          {config?.llm_configured ? `${config.llm_provider === 'adc' ? 'GCP ADC' : 'API Key'} configured` : 'Not configured'}
+          {config?.llm_configured
+            ? `${config.llm_provider === 'adc' ? 'GCP ADC' : 'API Key'} configured${config.llm_provider === 'adc' && config.gcp_project ? ` (project: ${config.gcp_project})` : ''}`
+            : 'Not configured'}
         </span>
       </div>
 
