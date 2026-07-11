@@ -5,7 +5,7 @@
 <h1 align="center">OpenArgentum</h1>
 
 <p align="center">
-  A self-hosted, AI-powered personal finance manager that runs entirely on your own machine.
+  A self-hosted, AI-powered personal finance manager. No account, no cloud sync, no telemetry — you run it, you own your data.
 </p>
 
 <p align="center">
