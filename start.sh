@@ -207,10 +207,10 @@ except OSError:
     pass
 "
     echo ""
-    echo "  ┌──────────────────────────────────┐"
+    echo "  ┌───────────────────────────────────┐"
     echo "  │  Network access enabled           │"
-    echo "  │  PIN: $PIN                        │"
-    echo "  └──────────────────────────────────┘"
+    echo "  │  PIN: $PIN                      │"
+    echo "  └───────────────────────────────────┘"
 else
     # Disable network sharing when not in headless mode
     python3 -c "
@@ -241,11 +241,11 @@ fi
 
 if [ "$DEMO" = true ]; then
     export OPENARGENTUM_DEMO=1
-    echo "  ┌──────────────────────────────────┐"
-    echo "  │  Demo mode — sample database      │"
+    echo "  ┌───────────────────────────────────┐"
+    echo "  │  Demo mode - sample database      │"
     echo "  │  No API key or onboarding needed  │"
     echo "  │  Changes reset when you restart   │"
-    echo "  └──────────────────────────────────┘"
+    echo "  └───────────────────────────────────┘"
     echo ""
 fi
 
