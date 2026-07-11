@@ -196,12 +196,14 @@ OpenArgentum stores everything locally and reaches out to exactly one external s
 - **Network access is off by default.** When you enable it with `--headless`, it's protected by an auto-generated PIN with brute-force protection.
 - **Localhost is unauthenticated.** Anything running on your machine can reach the app on localhost, so treat your own machine as the trust boundary.
 
-### How Google handles the data you send to Gemini
+### Sending your data to Google Gemini
 
-Because your statements leave your machine to reach Gemini, **how Google may use that data matters** — and it differs by tier. **We recommend using Google's paid data terms** for real financial data:
+To read and categorize your statements, OpenArgentum sends the files you import to Google's Gemini API — that's the one thing that leaves your machine. **How Google may use that data differs by tier, so for real financial data we recommend Google's paid terms:**
 
-- **Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI).** Under the paid terms, Google **does not use your prompts or responses to train its models** or have them reviewed by humans, and processes them under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* — not spend — is what applies these terms, so you can stay within the free usage quota and still be protected.
-- **A free API key with no billing uses the "Unpaid" tier**, where Google uses your content to improve its products and human reviewers may read it. Google's own terms state: *"Do not submit sensitive, confidential, or personal information to the Unpaid Services."* Bank statements are exactly that, so we don't recommend the free tier for real financial data — it's fine for the demo or throwaway data.
+- **Recommended — paid terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Under Google's **current** paid terms, Google **says** it does not use your prompts or responses to train its models or have them reviewed by humans, and processes them under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* — not spend — is what applies these terms, so you can stay within the free usage quota.
+- **Free / Unpaid tier.** A free API key with no billing uses Google's "Unpaid" tier, where — under Google's terms — your content **may** be used to improve its products and **may** be read by human reviewers. Google's own terms even state: *"Do not submit sensitive, confidential, or personal information to the Unpaid Services."* Bank statements are exactly that, so we don't recommend the free tier for real financial data — it's ideal for the demo or trying the AI features.
+
+The table below summarizes **what Google's current terms say** — not a guarantee of Google's behavior, and subject to change by Google at any time:
 
 | | Free / Unpaid (no billing) | Paid (billing enabled) | Vertex AI (Google Cloud) |
 |---|---|---|---|
@@ -233,7 +235,7 @@ Your database, config, and uploaded files live in the `data/` directory which is
 
 ### API Key Setup
 
-For **real financial data we recommend Google's paid data terms** — see [How Google handles the data you send to Gemini](#how-google-handles-the-data-you-send-to-gemini) above for why. Both options below work; enabling [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on your key's project (Option A) or using Google Cloud credentials (Option B) puts you on the paid terms.
+For **real financial data we recommend Google's paid data terms** — see [Sending your data to Google Gemini](#sending-your-data-to-google-gemini) above for why. Both options below work; enabling [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on your key's project (Option A) or using Google Cloud credentials (Option B) puts you on the paid terms.
 
 **Option A: API Key**
 1. Get a key from [Google AI Studio](https://aistudio.google.com/apikey)
