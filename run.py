@@ -24,11 +24,30 @@ if not is_dev:
     logging.getLogger("google_genai").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
+def _port_in_use(host: str, port: int) -> bool:
+    """Return True if something is already bound to (host, port)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+            return False
+        except OSError:
+            return True
+
+
 if __name__ == "__main__":
     from backend.config import DEFAULT_PORT
 
     port = DEFAULT_PORT
     host = "0.0.0.0"
+
+    # Fail gracefully if the port is taken — usually a previous instance still running.
+    if _port_in_use(host, port):
+        print(f"\n  ✗ Port {port} is already in use.")
+        print(f"     OpenArgentum may already be running — try opening http://localhost:{port}")
+        print( "     If it's a stale process, stop it and start again. To use a different port:")
+        print(f"       PORT=8100 ./start.sh{' --demo' if os.getenv('OPENARGENTUM_DEMO') else ''}")
+        print()
+        sys.exit(1)
 
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
