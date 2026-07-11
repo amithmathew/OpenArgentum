@@ -64,7 +64,14 @@ Browsing makes no external calls and needs no key. Any changes reset when you re
 
 The signature features — statement import and the Aurelia assistant — call Gemini, so they need an API key. To test them without touching your real data, add a key and import the bundled `demo/sample_statement.pdf`. It's synthetic, so a free key is fine for this — watch OpenArgentum extract and categorize every transaction, then ask Aurelia about it.
 
-When you're ready for your own statements, see [Configuration](#configuration) for why we recommend a paid-tier key for real financial data.
+**From demo to your own data:**
+
+Done looking around? The way out depends on how you got in:
+
+- **Launched with `./start.sh --demo`?** The flag pins the sample database for the whole session — stop the server and restart with plain `./start.sh` to begin setup.
+- **Clicked "Explore with sample data"?** Use **Set up my data** in the banner at the top of the app — it walks you through connecting Gemini and choosing a database, then points you at Import. (Prefer to do it by hand? Settings → Database.)
+
+Either way, the demo data stays put in `demo.db` if you ever want it back. Before importing real statements, see [Configuration](#configuration) for why we recommend a paid-tier key for real financial data.
 
 ---
 

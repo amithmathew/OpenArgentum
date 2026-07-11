@@ -6,6 +6,7 @@ import { ChatContext } from './chat-context'
 import OnboardingWizard from './components/OnboardingWizard'
 import { api } from './api'
 import AppLogo from './components/AppLogo'
+import DemoBanner from './components/DemoBanner'
 import AureliaIcon from './components/AureliaIcon'
 import useIsMobile from './hooks/useIsMobile'
 import Dashboard from './pages/Dashboard'
@@ -275,6 +276,8 @@ export default function App() {
   const [chatFullscreen, setChatFullscreen] = useState(false)
   const [pendingPrompt, setPendingPrompt] = useState(null)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [wizardMode, setWizardMode] = useState('fresh')
+  const [appConfig, setAppConfig] = useState(null)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [needsAuth, setNeedsAuth] = useState(false)
   const navigate = useNavigate()
@@ -299,6 +302,7 @@ export default function App() {
       }
       // Then check onboarding — demo mode (--demo) bypasses it entirely
       return api.get('/settings/app-config').then(config => {
+        setAppConfig(config)
         if (!config.onboarding_complete && !config.demo_mode) {
           setShowOnboarding(true)
         }
@@ -401,16 +405,24 @@ export default function App() {
       </nav>
       {/* Main content — hidden when chat is fullscreen */}
       {!chatFullscreen && (
-        <main className="flex-1 overflow-auto px-3 md:px-6 py-4 md:py-6 pb-24 md:pb-20 min-w-0">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/import" element={<Import />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </main>
+        <div className="flex-1 flex flex-col min-w-0">
+          {appConfig?.demo_db_active && (
+            <DemoBanner
+              demoMode={appConfig.demo_mode}
+              onStartSetup={() => { setWizardMode('transition'); setShowOnboarding(true) }}
+            />
+          )}
+          <main className="flex-1 overflow-auto px-3 md:px-6 py-4 md:py-6 pb-24 md:pb-20 min-w-0">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/import" element={<Import />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </main>
+        </div>
       )}
 
       {/* Aurelia FAB — hidden when chat is open */}
@@ -441,7 +453,21 @@ export default function App() {
           onToggleFullscreen={() => { setChatFullscreen(f => !f); if (!chatOpen) setChatOpen(true) }}
           onNavigate={(path) => { if (chatFullscreen) setChatFullscreen(false); navigate(path) }} />
       </ChatErrorBoundary>
-      {showOnboarding && <OnboardingWizard onComplete={() => setShowOnboarding(false)} />}
+      {showOnboarding && (
+        <OnboardingWizard
+          mode={wizardMode}
+          llmConfigured={appConfig?.llm_configured}
+          onClose={() => setShowOnboarding(false)}
+          onComplete={() => {
+            if (wizardMode === 'transition') {
+              // Reload so app-config, caches, and the demo banner all reset.
+              window.location.reload()
+            } else {
+              setShowOnboarding(false)
+            }
+          }}
+        />
+      )}
     </div>
     </ChatContext.Provider>
   )

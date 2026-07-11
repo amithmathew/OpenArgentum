@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api'
 
-export default function OnboardingWizard({ onComplete }) {
+// mode='fresh' is first-run onboarding (unescapable). mode='transition' re-opens
+// the wizard from the demo banner: skips the welcome step, lets an already-configured
+// LLM pass through, adds a choose-your-database step, and can be closed.
+export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false, onClose, onComplete }) {
+  const transition = mode === 'transition'
   const [step, setStep] = useState(0)
   const [provider, setProvider] = useState('api_key')
   const [apiKey, setApiKey] = useState('')
@@ -10,6 +14,23 @@ export default function OnboardingWizard({ onComplete }) {
   const [testResult, setTestResult] = useState(null)
   const [saving, setSaving] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
+  // Transition mode: database choice
+  const [databases, setDatabases] = useState(null)
+  const [dbChoice, setDbChoice] = useState(null) // a db name, or '__new__'
+  const [newDbName, setNewDbName] = useState('')
+  const [finishError, setFinishError] = useState(null)
+
+  useEffect(() => {
+    if (!transition) return
+    api.get('/settings/databases').then(res => {
+      const real = res.databases.filter(db => !db.is_demo)
+      setDatabases(real)
+      setDbChoice(real.length > 0 ? real[0].name : '__new__')
+    }).catch(() => {
+      setDatabases([])
+      setDbChoice('__new__')
+    })
+  }, [transition])
 
   const handleTestLLM = async () => {
     setTesting(true)
@@ -50,9 +71,27 @@ export default function OnboardingWizard({ onComplete }) {
     }
   }
 
-  const steps = [
-    // Step 0: Welcome
-    <div key="welcome" className="text-center">
+  const handleFinishTransition = async () => {
+    // Onboarding is already complete in transition mode — just create/switch the DB.
+    setSaving(true)
+    setFinishError(null)
+    try {
+      let target = dbChoice
+      if (dbChoice === '__new__') {
+        const created = await api.post('/settings/databases', { name: newDbName.trim() })
+        target = created.name
+      }
+      await api.post('/settings/switch-database', { name: target })
+      onComplete()
+    } catch (e) {
+      setFinishError(e.message)
+      setSaving(false)
+    }
+  }
+
+  // Fresh onboarding: Welcome
+  const welcomeStep = { key: 'welcome', content: (
+    <div className="text-center">
       <div className="text-4xl mb-4">✨</div>
       <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>Welcome to OpenArgentum</h2>
       <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
@@ -76,14 +115,22 @@ export default function OnboardingWizard({ onComplete }) {
           Loads a demo database of realistic transactions — no API key needed. Switch to your own data anytime in Settings.
         </p>
       </div>
-    </div>,
+    </div>
+  ) }
 
-    // Step 1: LLM Setup
-    <div key="llm">
+  // LLM Setup (both modes)
+  const llmStep = { key: 'llm', content: (
+    <div>
       <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--color-text)' }}>Set up AI</h2>
       <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
         Aurelia and statement import use the Google Gemini API. Connect it with a Gemini API key or your Google Cloud credentials. Everything else — the dashboard, and viewing or editing transactions manually — works without one, and you can add it later in Settings.
       </p>
+
+      {transition && llmConfigured && (
+        <div className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent-text)' }}>
+          ✓ AI is already configured — you can skip ahead, or update it below.
+        </div>
+      )}
 
       <div className="text-xs mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
         <p className="mb-2">
@@ -166,10 +213,12 @@ export default function OnboardingWizard({ onComplete }) {
           {testResult.ok ? '✓ ' : '✗ '}{testResult.message}
         </div>
       )}
-    </div>,
+    </div>
+  ) }
 
-    // Step 2: Done
-    <div key="done" className="text-center">
+  // Fresh onboarding: Done
+  const doneStep = { key: 'done', content: (
+    <div className="text-center">
       <div className="text-4xl mb-4">🎉</div>
       <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--color-text)' }}>You're all set!</h2>
       <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
@@ -180,15 +229,97 @@ export default function OnboardingWizard({ onComplete }) {
         <p><strong>2.</strong> Click <strong>Ingest</strong> to extract transactions</p>
         <p><strong>3.</strong> Check the <strong>Dashboard</strong> for insights, or ask <strong>Aurelia</strong> anything</p>
       </div>
-    </div>,
-  ]
+    </div>
+  ) }
 
-  const canProceed = step === 0 || (step === 1 && testResult?.ok) || step === 2
+  // Transition mode: pick (or create) the database that replaces the demo
+  const dbOptionStyle = (selected) => ({
+    border: `1px solid ${selected ? 'var(--color-accent)' : 'var(--color-border-light)'}`,
+    backgroundColor: selected ? 'var(--color-accent-light)' : 'var(--color-surface-alt)',
+    color: 'var(--color-text)',
+  })
+  const chooseDbStep = { key: 'choosedb', content: (
+    <div>
+      <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--color-text)' }}>Choose your database</h2>
+      <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
+        Your data lives in a local database file, separate from the demo. Pick one to use, or create a fresh one — the sample data stays in demo.db if you ever want it back.
+      </p>
+      {databases === null ? (
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading databases…</p>
+      ) : (
+        <div className="space-y-2">
+          {databases.map(db => (
+            <label key={db.name} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all" style={dbOptionStyle(dbChoice === db.name)}>
+              <input type="radio" name="db-choice" checked={dbChoice === db.name} onChange={() => setDbChoice(db.name)} />
+              <span className="font-medium">{db.name}</span>
+            </label>
+          ))}
+          <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer text-sm transition-all" style={dbOptionStyle(dbChoice === '__new__')}>
+            <input type="radio" name="db-choice" checked={dbChoice === '__new__'} onChange={() => setDbChoice('__new__')} />
+            <span className="font-medium">Create a new database</span>
+          </label>
+          {dbChoice === '__new__' && (
+            <input
+              className="theme-input w-full px-3 py-2 text-sm"
+              value={newDbName}
+              onChange={e => setNewDbName(e.target.value)}
+              placeholder="e.g. finance"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  ) }
+
+  // Transition mode: Done
+  const newName = newDbName.trim()
+  const targetDbLabel = dbChoice === '__new__'
+    ? (newName ? (newName.endsWith('.db') ? newName : `${newName}.db`) : 'your new database')
+    : dbChoice
+  const doneTransitionStep = { key: 'done-transition', content: (
+    <div className="text-center">
+      <div className="text-4xl mb-4">🎉</div>
+      <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--color-text)' }}>Ready to switch</h2>
+      <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
+        Finishing switches you from the demo to <strong>{targetDbLabel}</strong>. Then:
+      </p>
+      <div className="text-xs space-y-2" style={{ color: 'var(--color-text-muted)' }}>
+        <p><strong>1.</strong> Go to <strong>Import</strong> and upload your PDF or CSV statements</p>
+        <p><strong>2.</strong> Click <strong>Ingest</strong> to extract transactions</p>
+        <p><strong>3.</strong> Check the <strong>Dashboard</strong> for insights, or ask <strong>Aurelia</strong> anything</p>
+      </div>
+      {finishError && (
+        <div className="mt-3 text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-danger)' }}>
+          ✗ {finishError}
+        </div>
+      )}
+    </div>
+  ) }
+
+  const steps = transition
+    ? [llmStep, chooseDbStep, doneTransitionStep]
+    : [welcomeStep, llmStep, doneStep]
+
+  const stepKey = steps[step].key
+  const canProceed =
+    stepKey === 'llm' ? (testResult?.ok || (transition && llmConfigured))
+    : stepKey === 'choosedb' ? (dbChoice === '__new__' ? newName.length > 0 : !!dbChoice)
+    : true
   const isLast = step === steps.length - 1
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-      <div className="w-full max-w-md mx-4 rounded-2xl p-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <div className="relative w-full max-w-md mx-4 rounded-2xl p-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+        {/* Close — transition mode only; fresh onboarding stays unescapable */}
+        {transition && (
+          <button onClick={onClose} title="Close"
+            className="absolute top-3 right-3 p-1.5 rounded-lg transition-colors hover:opacity-70"
+            style={{ color: 'var(--color-text-muted)' }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
         {/* Progress dots */}
         <div className="flex justify-center gap-2 mb-6">
           {steps.map((_, i) => (
@@ -201,24 +332,33 @@ export default function OnboardingWizard({ onComplete }) {
 
         {/* Step content */}
         <div className="min-h-[250px] max-h-[70vh] overflow-y-auto flex flex-col justify-center">
-          {steps[step]}
+          {steps[step].content}
         </div>
 
         {/* Navigation */}
         <div className="flex justify-between mt-6 pt-4" style={{ borderTop: '1px solid var(--color-border-light)' }}>
-          <button onClick={() => setStep(s => s - 1)} disabled={step === 0}
-            className="theme-btn-secondary px-4 py-2 text-sm disabled:opacity-30">
-            Back
-          </button>
+          {transition && step === 0 ? (
+            <button onClick={onClose}
+              className="theme-btn-secondary px-4 py-2 text-sm">
+              Cancel
+            </button>
+          ) : (
+            <button onClick={() => setStep(s => s - 1)} disabled={step === 0}
+              className="theme-btn-secondary px-4 py-2 text-sm disabled:opacity-30">
+              Back
+            </button>
+          )}
           {isLast ? (
-            <button onClick={handleFinish} disabled={saving}
+            <button onClick={transition ? handleFinishTransition : handleFinish} disabled={saving}
               className="theme-btn-primary px-6 py-2 text-sm">
-              {saving ? 'Starting...' : 'Get Started'}
+              {transition
+                ? (saving ? 'Switching…' : 'Switch & finish')
+                : (saving ? 'Starting...' : 'Get Started')}
             </button>
           ) : (
             <button onClick={() => setStep(s => s + 1)} disabled={!canProceed}
               className="theme-btn-primary px-4 py-2 text-sm disabled:opacity-30">
-              {step === 1 && !testResult?.ok ? 'Configure above first' : 'Next'}
+              {stepKey === 'llm' && !canProceed ? 'Configure above first' : 'Next'}
             </button>
           )}
         </div>

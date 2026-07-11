@@ -58,7 +58,14 @@ Not ready to import your own statements yet? OpenArgentum ships with a sample da
 - **From onboarding:** on first launch, click **Explore with sample data** on the welcome screen.
 - **Anytime:** open **Settings → Databases** and switch to the **Demo** database.
 
-Browsing the demo makes no external calls and needs no Gemini key. Any changes you make to the demo reset when you restart the server, and you can switch back to your own data from Settings whenever you're ready.
+Browsing the demo makes no external calls and needs no Gemini key. Any changes you make to the demo reset when you restart the server. While the demo database is active, a banner at the top of the app reminds you you're on sample data.
+
+### Moving to your own data
+
+- **Launched with `./start.sh --demo`?** The flag keeps the sample database active for the whole session. Stop the server and restart with plain `./start.sh` — the setup wizard takes it from there.
+- **Entered the demo from the app?** Click **Set up my data** in the banner at the top of the app. It walks you through connecting Gemini and choosing (or creating) your database, then points you at Import. You can also do it manually: **Settings → Database** to switch, and **Settings → LLM Configuration** to add a key.
+
+The sample data stays in `demo.db` either way, so you can always switch back for a look.
 
 ---
 

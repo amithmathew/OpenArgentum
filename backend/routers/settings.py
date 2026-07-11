@@ -52,6 +52,9 @@ def get_app_config():
     return {
         "onboarding_complete": config.get("onboarding_complete", False),
         "demo_mode": bool(os.getenv("OPENARGENTUM_DEMO")),
+        "active_db": get_db_name(),
+        # True whenever the demo database is active — via --demo or a Settings switch.
+        "demo_db_active": get_db_name() == "demo.db",
         "llm_configured": bool(config.get("gemini_api_key") or config.get("llm_provider") == "adc"),
         "llm_provider": config.get("llm_provider", "none"),
         "gcp_project": config.get("gcp_project"),
