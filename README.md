@@ -9,6 +9,11 @@
 </p>
 
 <p align="center">
+  <em>For people who check in on their finances every few weeks — not every day.<br />
+  Dump in your statements, then let Aurelia make sense of it all.</em>
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0" /></a>
   <a href="https://github.com/amithmathew/OpenArgentum/stargazers"><img src="https://img.shields.io/github/stars/amithmathew/OpenArgentum?style=social" alt="GitHub stars" /></a>
 </p>
@@ -21,11 +26,13 @@
   <a href="https://github.com/amithmathew/OpenArgentum/issues">Report an Issue</a>
 </p>
 
-- **AI-powered import** -- Drop in your bank statements (PDF, CSV, or ZIP). AI extracts every transaction, assigns categories and tags, and catches duplicates automatically.
-- **Conversational finance** -- Ask Aurelia, your built-in AI assistant, anything about your spending. Get charts, insights, and safe bulk edits through plain English.
-- **Your data, no lock-in** -- All data lives in a local SQLite database on your machine. No cloud sync, no account, no telemetry. You own your data and can do whatever you want with it.
+- **Talk to your finances** -- Aurelia, the built-in AI agent, is the main way you work. Ask her anything, and she acts: she reasons about your transactions, makes changes, generates charts inline, and drops you into the filtered view. Not a search box — no filter or rules engine can express *"expenses that seem travel-related."*
+- **Built for batch, not daily chores** -- Drop in everything you've got: PDFs, CSVs, or a ZIP of a dozen statements across every account. AI extracts each transaction, categorizes and tags it.
+- **The numbers come out right** -- Overlapping statements are deduplicated automatically, and inter-account transfers are detected — so paying your credit card from checking doesn't look like you spent the money twice. Import messily; the totals stay honest.
+- **Projects, not just categories** -- Life happens in episodes — a trip, a renovation, a wedding. Group transactions into projects retrospectively, which is how you actually think about your spending.
+- **You stay in the loop** -- Imports get a human review step, and Aurelia's bulk edits require your approval. The AI proposes; you decide.
+- **Your data, no lock-in** -- Local SQLite database on your machine. No cloud sync, no account, no telemetry. **No bank credentials, ever** — OpenArgentum reads statements you already have; it never connects to your bank.
 - **One command setup** -- `./start.sh` handles everything. No Docker, no database server, no config files.
-- **Mobile-friendly** -- Works on your phone too. Responsive design with touch-optimized controls.
 
 <p align="center">
   <img src="assets/gifs/hero.png" alt="OpenArgentum Dashboard with Aurelia AI assistant" width="800" />
@@ -35,7 +42,7 @@
 
 ## Quick Start
 
-**You need:** Python 3.11+, Node.js 20.19+, and a [free Google Gemini API key](https://aistudio.google.com/apikey) (or existing Google Cloud Application Default Credentials)
+**You need:** Python 3.11+, Node.js 20.19+, and a [Google Gemini API key](https://aistudio.google.com/apikey) (or existing Google Cloud Application Default Credentials). **Use a paid-tier key for real financial data** — see [Configuration](#configuration) for why.
 
 ```bash
 git clone https://github.com/amithmathew/OpenArgentum.git
@@ -98,6 +105,14 @@ Drop your bank and credit card statements into OpenArgentum and let AI do the re
 Aurelia is your AI finance assistant. She lives inside OpenArgentum, has direct access to your data, and can answer questions, build charts, and make changes -- all through conversation.
 
 <br clear="left" />
+
+Aurelia isn't a chatbot bolted onto a dashboard — she's the primary interface. She has a full analytical loop: she can query and aggregate your transactions, compare periods, generate charts inline as you talk, navigate you to the filtered transaction view, write and search notes on transactions, and make bulk edits with your approval.
+
+This matters most when you're doing archaeology. If you only look at your finances every few weeks, you're facing a pile of transactions with no memory of what half of them were. Static dashboards only answer questions you anticipated when you built them. Aurelia answers the question you just thought of:
+
+> *"I travelled to Japan in early May — find transactions in that period that are in yen or look travel-related, and assign them to a Japan trip project."*
+
+She reasons about which transactions qualify, makes the changes with your approval, and drops you into the filtered view when she's done.
 
 ### Ask anything about your money
 
@@ -189,7 +204,7 @@ Eight built-in color themes.
 
 ## Access from Your Phone
 
-Run with `./start.sh --headless` to access OpenArgentum from any device on your local trusted network. A PIN is generated automatically to keep things secure.
+Run with `./start.sh --headless` to access OpenArgentum from any device on your local trusted network. A PIN is generated automatically to keep things secure. The UI is fully responsive with touch-optimized controls, so it works just as well from your phone.
 
 ---
 
@@ -205,21 +220,14 @@ OpenArgentum stores everything locally and reaches out to exactly one external s
 
 ### Sending your data to Google Gemini
 
-To read and categorize your statements, OpenArgentum sends the files you import to Google's Gemini API — that's the one thing that leaves your machine. **How Google may use that data differs by tier, so for real financial data we recommend Google's paid terms:**
+To read and categorize your statements, OpenArgentum sends the files you import to Google's Gemini API. **Google's data protection terms differ by billing tier, so for real financial data we recommend Google's paid terms:**
 
-- **Recommended — paid terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Under Google's **current** paid terms, Google **says** it does not use your prompts or responses to train its models or have them reviewed by humans, and processes them under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* — not spend — is what applies these terms, so you can stay within the free usage quota.
-- **Free / Unpaid tier.** A free API key with no billing uses Google's "Unpaid" tier, where — under Google's terms — your content **may** be used to improve its products and **may** be read by human reviewers. Google's own terms even state: *"Do not submit sensitive, confidential, or personal information to the Unpaid Services."* Bank statements are exactly that, so we don't recommend the free tier for real financial data — it's ideal for the demo or trying the AI features.
+- **Recommended — paid terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Under Google's paid terms, Google processes your information under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* (not spend) is what applies these terms, so you can stay within any free usage quotas if available.
+- **Free / Unpaid tier.** A free API key with no billing uses Google's "Unpaid" tier. This is ideal for the demo or trying the AI features, however we highly recommend switching to the paid terms as per Google's recommendations for personal information.
 
-The table below summarizes **what Google's current terms say** — not a guarantee of Google's behavior, and subject to change by Google at any time:
+Ultimately, this is your call. Pick the option you're comfortable with, and review Google's current terms before you commit.
 
-| | Free / Unpaid (no billing) | Paid (billing enabled) | Vertex AI (Google Cloud) |
-|---|---|---|---|
-| Used to improve Google products / train models | Yes | No | No |
-| Human review of prompts & responses | Yes (identifiers stripped first) | No | No (abuse-monitoring only; [opt-out available](https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance)) |
-| Governed by a Data Processing Addendum | No | Yes | Yes (Cloud DPA) |
-| Google's guidance | "Do not submit sensitive, confidential, or personal information" | Suitable for sensitive data | Enterprise data terms |
-
-Sources: [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) · [Data logging policy](https://ai.google.dev/gemini-api/docs/logs-policy) · [Vertex AI data governance](https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance). **These terms are set by Google and can change at any time — you are responsible for reviewing the current terms before sending real data.**
+Sources: [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) · [Data logging policy](https://ai.google.dev/gemini-api/docs/logs-policy) · [Vertex AI data governance](https://cloud.google.com/vertex-ai/generative-ai/docs/data-governance)
 
 > *OpenArgentum is an independent, open-source project. It is not affiliated with, endorsed by, or sponsored by Google. Google, Gemini, Google Cloud, and Vertex AI are trademarks of Google LLC.*
 
@@ -247,7 +255,7 @@ For **real financial data we recommend Google's paid data terms** — see [Sendi
 **Option A: API Key**
 1. Get a key from [Google AI Studio](https://aistudio.google.com/apikey)
 2. Enter it during onboarding, or later on the Settings page
-3. For paid data terms, enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the key's Google Cloud project (you can stay within the free quota). Without billing, the key uses the Unpaid tier — fine for the demo, not for real statements.
+3. For paid data terms, enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the key's Google Cloud project (you can stay within any free quotas available). Without billing, the key uses the Unpaid tier.
 
 **Option B: Google Cloud credentials (Vertex AI)** — enterprise data terms
 1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)

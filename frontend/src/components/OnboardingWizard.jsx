@@ -134,20 +134,20 @@ export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false
 
       <div className="text-xs mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
         <p className="mb-2">
-          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them — the one thing that leaves your machine. How Google may use it depends on your tier, so <strong>for real financial data we recommend Google's paid terms</strong>:
+          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. We recommend <strong>Google's paid terms</strong> for real financial data:
         </p>
         <ul className="space-y-1.5 mb-2 list-none">
           <li>
             <strong style={{ color: 'var(--color-text)' }}>✓ Real statements:</strong> enable{' '}
             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Cloud Billing</a>{' '}
-            (or use GCP credentials below). Under Google's current paid terms, they say your data isn't used to train their models or seen by human reviewers.
+            (or use GCP credentials below). Google's paid terms provide data protection provisions for personal and private information.
           </li>
           <li>
-            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> great for the demo and trying things out. Under Google's free terms your content may be used to improve its products and may be human-reviewed — so we don't recommend it for real statements.
+            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> great for the demo and trying things out. We recommend switching to the paid tier for your actual financial data.
           </li>
         </ul>
         <p style={{ color: 'var(--color-text-muted)' }}>
-          These are Google's terms, not ours, and can change at any time — always check the current{' '}
+          Google's terms can change at any time — always check the current{' '}
           <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Gemini API terms</a>.
         </p>
       </div>
@@ -176,7 +176,7 @@ export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false
       {provider === 'api_key' ? (
         <div>
           <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-            Get a free API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a> — perfect for trying the demo and AI features. For real statements, we recommend enabling billing (see above).
+            Get an API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a> — even without billing it's perfect for trying the demo and AI features. For real statements, we recommend enabling billing (see above).
           </p>
           <input
             className="theme-input w-full px-3 py-2 text-sm mb-3"
@@ -189,7 +189,7 @@ export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false
       ) : (
         <div>
           <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-            Using Application Default Credentials — Vertex AI on GCP, which uses Google's paid/enterprise data terms. Make sure you've run <code className="text-xs px-1 rounded" style={{ backgroundColor: 'var(--color-surface-alt)' }}>gcloud auth application-default login</code>
+            Using Application Default Credentials — Vertex AI on GCP. Make sure you've run <code className="text-xs px-1 rounded" style={{ backgroundColor: 'var(--color-surface-alt)' }}>gcloud auth application-default login</code>
           </p>
           <input
             className="theme-input w-full px-3 py-2 text-sm mb-3"

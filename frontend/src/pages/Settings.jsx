@@ -213,21 +213,21 @@ function LLMConfig() {
 
       <div className="text-xs mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
         <p className="mb-2">
-          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. How Google may use that data depends on your tier, so <strong>for real financial data we recommend Google's paid terms</strong>:
+          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. Google recommends using their <strong>paid terms</strong> for personal information such as real financial data:
         </p>
         <ul className="space-y-1.5 mb-2 list-none">
           <li>
             <strong style={{ color: 'var(--color-text)' }}>✓ Real statements:</strong> enable{' '}
             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Cloud Billing</a>{' '}
-            on your key's project, or use GCP credentials (Vertex AI). Under Google's current paid terms, they say your data isn't used to train their models or seen by human reviewers, and is processed under their{' '}
-            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Data Processing Addendum</a>. Billing <em>status</em>, not spend, applies these terms — you can stay within the free quota.
+            on your key's project, or use GCP credentials (Vertex AI). Google's paid terms provide data protection provisions for personal and private information under their{' '}
+            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Data Processing Addendum</a>. Billing <em>status</em> (not spend) applies these terms — you can stay within any available free quotas.
           </li>
           <li>
-            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> fine for the demo and trying things out. Under Google's free terms your content may be used to improve its products and may be human-reviewed — their terms even say <em>“Do not submit sensitive, confidential, or personal information to the Unpaid Services.”</em> Bank statements are exactly that, so we don't recommend it for real statements.
+            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> fine for the demo and trying things out. Google's terms do not recommend using the free tier for personal and private information such as real financial data, so we recommend switching to the paid tier for your actual financial data.
           </li>
         </ul>
         <p style={{ color: 'var(--color-text-muted)' }}>
-          These are Google's terms, not ours, and can change at any time — review the current{' '}
+          These are Google's terms (not ours) and can change at any time — review the current{' '}
           <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Gemini API terms</a>.
         </p>
       </div>
@@ -255,7 +255,7 @@ function LLMConfig() {
       {provider === 'api_key' ? (
         <>
           <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>
-            Get a free API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a>.
+            Get an API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a>.
           </p>
           <input className="theme-input w-full px-3 py-1.5 text-sm mb-3" type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Paste new Gemini API key..." />
         </>

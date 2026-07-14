@@ -9,24 +9,24 @@ A step-by-step guide to setting up and using OpenArgentum for managing your pers
 1. **A computer** running macOS, Linux, or Windows (with WSL)
 2. **Python 3.11 or newer** -- [Download here](https://www.python.org/downloads/) if you don't have it (3.10 is the minimum; 3.11+ is recommended)
 3. **Node.js 20.19 or newer** -- [Download here](https://nodejs.org/) (choose the LTS version). Vite 8, which builds the app, requires 20.19+.
-4. **A way to reach the Google Gemini API** -- the simplest is a free API key from [Google AI Studio](https://aistudio.google.com/apikey) ("Create API Key", then copy it). **For real financial data we recommend Google's paid data terms** — see [Your data & privacy](#your-data--privacy) below.
+4. **A way to reach the Google Gemini API** -- the simplest is an API key from [Google AI Studio](https://aistudio.google.com/apikey) ("Create API Key", then copy it). **For real financial data we recommend Google's paid data terms** — see [Your data & privacy](#your-data--privacy) below.
 
 > **Don't have an API key yet?** You can still install the app and add the key later through the Settings page. You can also explore the app with a built-in **demo database** — see [Try the Demo](#try-the-demo-first) below — which needs no key at all.
 
-> **What it costs:** The Gemini free tier is enough for typical personal use, but it has rate limits. Heavy statement imports will queue and process one at a time, and at high volume you could exceed the free tier and spill into paid usage. Browsing your existing data is always free — only statement import and the Aurelia assistant call Gemini.
+> **What it costs:** Gemini's free usage quota is enough for typical personal use, but it has rate limits. Heavy statement imports will queue and process one at a time, and at high volume you could exceed the free quota and spill into paid usage. Browsing your existing data is always free — only statement import and the Aurelia assistant call Gemini.
 >
-> Note that **cost and data protection are separate things.** Enabling Cloud Billing is what moves you to Google's paid *data* terms (no model-training use, no human review) — even if you stay within the free usage quota. See [Your data & privacy](#your-data--privacy).
+> Note that **cost and data protection are separate things.** Enabling Cloud Billing is what moves you to Google's paid *data* terms — even if you stay within the free usage quota. See [Your data & privacy](#your-data--privacy).
 
 ### Your data & privacy
 
 OpenArgentum stores everything locally in a SQLite database on your machine — no cloud sync, no account, no telemetry. It reaches out to exactly one external service, on purpose: to read and categorize your statements, the contents of the files you import are sent to the Google Gemini API. That is the only data that leaves your machine, and it only happens for AI features (statement import and the Aurelia assistant). Browsing your existing data makes no external calls, and OpenArgentum never connects to your bank.
 
-**How Google uses the data you send to Gemini depends on your tier — and we recommend the paid terms for real financial data:**
+**Google's data protection terms differ by billing tier, so for real financial data we recommend Google's paid terms:**
 
-- **Recommended — paid data terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Under Google's **current** paid terms, Google **says** it does not use your prompts or responses to train its models or have them reviewed by humans, and processes them under its [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status*, not spend, is what applies these terms — you can stay within the free quota.
-- **Free / Unpaid tier.** A free key with no billing sends your data under Google's Unpaid terms, where — under those terms — your content **may** be used to improve Google's products and **may** be read by human reviewers. Google's terms even state: *"Do not submit sensitive, confidential, or personal information to the Unpaid Services."* Since statements are exactly that, use the free tier only for the demo or throwaway data.
+- **Recommended — paid data terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Under Google's paid terms, Google processes your information under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* (not spend) is what applies these terms, so you can stay within any free usage quotas if available.
+- **Free / Unpaid tier.** A free key with no billing uses Google's "Unpaid" tier. This is ideal for the demo or throwaway data, however we highly recommend switching to the paid terms as per Google's recommendations for personal information.
 
-These terms are Google's and **can change at any time — you are responsible for reviewing the current [Gemini API terms](https://ai.google.dev/gemini-api/terms) before sending real data.**
+Ultimately, this is your call. Pick the option you're comfortable with, and review the current [Gemini API terms](https://ai.google.dev/gemini-api/terms) before you commit.
 
 ---
 
@@ -208,7 +208,7 @@ The app is fully optimized for mobile -- you'll get a bottom tab bar for navigat
 
 **AI features aren't working:**
 - Check that your Gemini API key is set in Settings
-- The free Gemini API tier has rate limits -- if you're processing many statements, they'll queue and process sequentially
+- The Gemini API has rate limits (tightest without billing enabled) -- if you're processing many statements, they'll queue and process sequentially
 
 **The chat shows "Chat encountered an error":**
 - Click "Retry" to try again
