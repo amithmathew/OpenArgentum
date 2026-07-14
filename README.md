@@ -78,7 +78,7 @@ Done looking around? The way out depends on how you got in:
 - **Launched with `./start.sh --demo`?** The flag pins the sample database for the whole session — stop the server and restart with plain `./start.sh` to begin setup.
 - **Clicked "Explore with sample data"?** Use **Set up my data** in the banner at the top of the app — it walks you through connecting Gemini and choosing a database, then points you at Import. (Prefer to do it by hand? Settings → Database.)
 
-Either way, the demo data stays put in `demo.db` if you ever want it back. Before importing real statements, see [Configuration](#configuration) for why we recommend a paid-tier key for real financial data.
+Either way, the demo data stays put in `demo.db` if you ever want it back. Before importing real statements, see [Configuration](#configuration) — Google recommends the paid terms if personal information is involved.
 
 ---
 
@@ -220,10 +220,10 @@ OpenArgentum stores everything locally and reaches out to exactly one external s
 
 ### Sending your data to Google Gemini
 
-To read and categorize your statements, OpenArgentum sends the files you import to Google's Gemini API. **Google's data protection terms differ by billing tier, so for real financial data we recommend Google's paid terms:**
+To read and categorize your statements, OpenArgentum sends the files you import to Google's Gemini API. **Google's data protection terms differ by billing tier:**
 
-- **Recommended — paid terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Under Google's paid terms, Google processes your information under the [Data Processing Addendum](https://ai.google.dev/gemini-api/terms). Billing *status* (not spend) is what applies these terms, so you can stay within any free usage quotas if available.
-- **Free / Unpaid tier.** A free API key with no billing uses Google's "Unpaid" tier. This is ideal for the demo or trying the AI features, however we highly recommend switching to the paid terms as per Google's recommendations for personal information.
+- **Recommended — paid terms.** Enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the Google Cloud project behind your API key, or use Google Cloud credentials (Vertex AI). Google processes your information as described in [their terms](https://ai.google.dev/gemini-api/terms). Billing *status* (not spend) is what applies these terms.
+- **Free / Unpaid tier.** A free API key with no billing uses Google's "Unpaid" tier. This is ideal for the demo or trying the AI features. Google recommends the paid terms if personal information is involved.
 
 Ultimately, this is your call. Pick the option you're comfortable with, and review Google's current terms before you commit.
 
@@ -250,12 +250,12 @@ Your database, config, and uploaded files live in the `data/` directory which is
 
 ### API Key Setup
 
-For **real financial data we recommend Google's paid data terms** — see [Sending your data to Google Gemini](#sending-your-data-to-google-gemini) above for why. Both options below work; enabling [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on your key's project (Option A) or using Google Cloud credentials (Option B) puts you on the paid terms.
+For **real financial data, Google recommends their paid data terms** — see [Sending your data to Google Gemini](#sending-your-data-to-google-gemini) above for why. Both options below work; enabling [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on your key's project (Option A) or using Google Cloud credentials (Option B) puts you on the paid terms.
 
 **Option A: API Key**
 1. Get a key from [Google AI Studio](https://aistudio.google.com/apikey)
 2. Enter it during onboarding, or later on the Settings page
-3. For paid data terms, enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the key's Google Cloud project (you can stay within any free quotas available). Without billing, the key uses the Unpaid tier.
+3. For paid data terms, enable [Cloud Billing](https://ai.google.dev/gemini-api/docs/billing) on the key's Google Cloud project. Without billing, the key uses the Unpaid tier.
 
 **Option B: Google Cloud credentials (Vertex AI)** — enterprise data terms
 1. Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)

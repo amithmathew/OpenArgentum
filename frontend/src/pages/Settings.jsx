@@ -213,17 +213,17 @@ function LLMConfig() {
 
       <div className="text-xs mb-3 px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
         <p className="mb-2">
-          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. Google recommends using their <strong>paid terms</strong> for personal information such as real financial data:
+          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. Google's data protection terms differ by billing tier:
         </p>
         <ul className="space-y-1.5 mb-2 list-none">
           <li>
             <strong style={{ color: 'var(--color-text)' }}>✓ Real statements:</strong> enable{' '}
             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Cloud Billing</a>{' '}
-            on your key's project, or use GCP credentials (Vertex AI). Google's paid terms provide data protection provisions for personal and private information under their{' '}
-            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Data Processing Addendum</a>. Billing <em>status</em> (not spend) applies these terms — you can stay within any available free quotas.
+            on your key's project, or use GCP credentials (Vertex AI). Google's paid terms provide data protection provisions for personal and private information under{' '}
+            <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>their terms</a>. Billing <em>status</em> (not spend) applies these terms.
           </li>
           <li>
-            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> fine for the demo and trying things out. Google's terms do not recommend using the free tier for personal and private information such as real financial data, so we recommend switching to the paid tier for your actual financial data.
+            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> fine for the demo and trying things out. Google recommends the paid terms if personal information is involved.
           </li>
         </ul>
         <p style={{ color: 'var(--color-text-muted)' }}>

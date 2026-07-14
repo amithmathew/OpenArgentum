@@ -134,7 +134,7 @@ export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false
 
       <div className="text-xs mb-4 px-3 py-2.5 rounded-lg" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-text-secondary)' }}>
         <p className="mb-2">
-          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. We recommend <strong>Google's paid terms</strong> for real financial data:
+          <strong style={{ color: 'var(--color-text)' }}>OpenArgentum sends the statements you import to Google Gemini</strong> to read and categorize them. Google's data protection terms differ by billing tier:
         </p>
         <ul className="space-y-1.5 mb-2 list-none">
           <li>
@@ -143,7 +143,7 @@ export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false
             (or use GCP credentials below). Google's paid terms provide data protection provisions for personal and private information.
           </li>
           <li>
-            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> great for the demo and trying things out. We recommend switching to the paid tier for your actual financial data.
+            <strong style={{ color: 'var(--color-text)' }}>⚠ Free tier:</strong> great for the demo and trying things out. Google recommends the paid terms if personal information is involved.
           </li>
         </ul>
         <p style={{ color: 'var(--color-text-muted)' }}>
@@ -176,7 +176,7 @@ export default function OnboardingWizard({ mode = 'fresh', llmConfigured = false
       {provider === 'api_key' ? (
         <div>
           <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-            Get an API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a> — even without billing it's perfect for trying the demo and AI features. For real statements, we recommend enabling billing (see above).
+            Get an API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-text)' }}>Google AI Studio</a> — even without billing it's perfect for trying the demo and AI features. For real statements, enable billing (see above).
           </p>
           <input
             className="theme-input w-full px-3 py-2 text-sm mb-3"
